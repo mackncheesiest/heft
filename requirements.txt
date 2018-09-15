@@ -1,0 +1,3 @@
+certifi==2018.8.24
+numpy==1.15.1
+wincertstore==0.2
