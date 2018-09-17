@@ -105,7 +105,7 @@ def readDagMatrix(dag_file, show_dag=False):
 def generate_argparser():
     parser = argparse.ArgumentParser(description="A tool for finding HEFT schedules for given DAG task graphs")
     parser.add_argument("dag_file", help="File to read input DAG from", type=str)
-    parser.add_argument("-l", "--loglevel", help="The log level to be used in this module", type=str, dest="loglevel", choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"], default="WARNING")
+    parser.add_argument("-l", "--loglevel", help="The log level to be used in this module. Default: INFO", type=str, dest="loglevel", choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"], default="INFO")
     return parser
 
 if __name__ == "__main__":
@@ -116,4 +116,4 @@ if __name__ == "__main__":
 
     heftEnv = HEFT_Environment()
     dag = readDagMatrix(args.dag_file, False)
-    schedule = heftEnv.schedule_dag(dag)
+    heftEnv.schedule_dag(dag)
