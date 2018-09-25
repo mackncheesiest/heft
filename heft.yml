@@ -2,44 +2,8 @@ name: heft
 channels:
 - defaults
 dependencies:
-- blas=1.0=mkl
-- ca-certificates=2018.03.07=0
-- certifi=2018.8.24=py37_1
-- cycler=0.10.0=py37_0
-- decorator=4.3.0=py37_0
-- freetype=2.9.1=ha9979f8_1
-- icc_rt=2017.0.4=h97af966_0
-- icu=58.2=ha66f8fd_1
-- intel-openmp=2019.0=117
-- jpeg=9b=hb83a4c4_2
-- kiwisolver=1.0.1=py37h6538335_0
-- libpng=1.6.34=h79bbb47_0
-- matplotlib=2.2.3=py37hd159220_0
-- mkl=2019.0=117
-- mkl_fft=1.0.4=py37h1e22a9b_1
-- mkl_random=1.0.1=py37h77b88f5_1
-- networkx=2.1=py37_0
-- numpy=1.15.1=py37ha559c80_0
-- numpy-base=1.15.1=py37h8128ebf_0
-- openssl=1.0.2p=hfa6e2cd_0
-- pip=10.0.1=py37_0
-- pyparsing=2.2.0=py37_1
-- pyqt=5.9.2=py37ha878b3d_0
-- python=3.7.0=hea74fb7_0
-- python-dateutil=2.7.3=py37_0
-- pytz=2018.5=py37_0
-- qt=5.9.6=vc14h62aca36_0
-- setuptools=40.2.0=py37_0
-- sip=4.19.12=py37h6538335_0
-- six=1.11.0=py37_1
-- sqlite=3.24.0=h7602738_0
-- tornado=5.1=py37hfa6e2cd_0
-- vc=14=h0510ff6_3
-- vs2015_runtime=14.0.25123=3
-- wheel=0.31.1=py37_0
-- wincertstore=0.2=py37_0
-- zlib=1.2.11=h8395fce_2
-- pip:
-  - mkl-fft==1.0.4
-  - mkl-random==1.0.1
+- matplotlib=2.2.3
+- networkx=2.1
+- numpy=1.15.1
+- python=3.7.0
 
