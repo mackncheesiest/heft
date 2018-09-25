@@ -124,6 +124,7 @@ def generate_argparser():
     parser = argparse.ArgumentParser(description="A tool for finding HEFT schedules for given DAG task graphs")
     parser.add_argument("dag_file", help="File to read input DAG from", type=str)
     parser.add_argument("-l", "--loglevel", help="The log level to be used in this module. Default: INFO", type=str, dest="loglevel", choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"], default="INFO")
+    parser.add_argument("--showGraph", help="Switch used to enable graph display with matplotlib", dest="showGraph", action="store_true")
     return parser
 
 if __name__ == "__main__":
@@ -133,5 +134,5 @@ if __name__ == "__main__":
     logging.basicConfig(format="%(levelname)8s : %(name)16s : %(message)s", level=logging.getLevelName(args.loglevel))
 
     heftEnv = HEFT_Environment()
-    dag = readDagMatrix(args.dag_file, False)
+    dag = readDagMatrix(args.dag_file, args.showGraph)
     heftEnv.schedule_dag(dag)
