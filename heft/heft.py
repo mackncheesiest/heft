@@ -117,7 +117,7 @@ class HEFT_Environment:
             predjob = self.task_schedules[prednode]
             assert predjob != None, f"Predecessor nodes must be scheduled before their children, but node {node} has an unscheduled predecessor of {predjob}"
             logger.debug(f"\tLooking at predecessor node {prednode} with job {predjob} to determine ready time")
-            ready_time_t = predjob.end + self.communication_matrix[predjob.proc-1, proc-1]
+            ready_time_t = predjob.end + self.communication_matrix[predjob.proc-1, proc-1] * float(dag[predjob.task][node]['weight'])
             if ready_time_t > ready_time:
                 ready_time = ready_time_t
         if ready_time == 0:
