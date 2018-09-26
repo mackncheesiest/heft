@@ -2,6 +2,7 @@
 
 from collections import deque, namedtuple
 from math import inf
+from gantt import ShowGanttChart
 
 import argparse
 import logging
@@ -76,7 +77,12 @@ class HEFT_Environment:
             self.task_schedules[node] = minTaskSchedule
             self.proc_schedules[minTaskSchedule.proc].append(minTaskSchedule)
             self.proc_schedules[minTaskSchedule.proc] = sorted(self.proc_schedules[minTaskSchedule.proc], key=lambda schedule_event: schedule_event.start)
-            logger.debug(f"task_schedules and proc_schedules now\n\ttask_schedules:{self.task_schedules}\n\tproc_schedules{self.proc_schedules}")
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.debug('\n')
+                for proc, jobs in self.proc_schedules.items():
+                    logger.debug(f"Processor {proc} has the following jobs:")
+                    logger.debug(f"\t{jobs}")
+                logger.debug('\n')
             for proc in range(1, len(self.proc_schedules) + 1):
                 for job in range(len(self.proc_schedules[proc])-1):
                     first_end = self.proc_schedules[proc][job].end
@@ -136,19 +142,23 @@ class HEFT_Environment:
             #Start of next job - computation time == latest we can start in this window
             #Max(ready_time, previous job's end) == earliest we can start in this window
             #If there's space in there, schedule in it
-            logging.debug(f"\tLooking to fit a job of length {computation_time} into a slot of size {next_job.start - max(ready_time, prev_job.end)}")
+            logger.debug(f"\tLooking to fit a job of length {computation_time} into a slot of size {next_job.start - max(ready_time, prev_job.end)}")
             if (next_job.start - computation_time) - max(ready_time, prev_job.end) >= 0:
-                logging.debug("\tIt looks like I can pull it off!")
+                logger.debug("\tIt looks like we can pull it off!")
                 job_start = max(ready_time, prev_job.end)
                 min_schedule = ScheduleEvent(node, job_start, job_start + computation_time, proc)
                 break
         else:
             #For-else loop: the else executes if the for loop exits without break-ing, which in this case means the number of jobs on this processor are 0
             min_schedule = ScheduleEvent(node, ready_time, ready_time + computation_time, proc)
-        logging.debug(f"\tFor node {node} on processor {proc}, the EFT is {min_schedule}")
+        logger.debug(f"\tFor node {node} on processor {proc}, the EFT is {min_schedule}")
         return min_schedule    
 
 def readDagMatrix(dag_file, show_dag=False):
+    """
+    Given an input file consisting of a connectivity matrix, reads and parses it into a networkx Directional Graph (DiGraph)
+    """
+    #TODO: Migrate this to use our newer CSV format
     with open(dag_file) as fd:
         contents = fd.read()
         contentsList = contents.split('\n')
@@ -156,7 +166,7 @@ def readDagMatrix(dag_file, show_dag=False):
         
         dag = nx.DiGraph(np.matrix(contentsList))
         dag.remove_edges_from(
-            # All edges with weight of 0
+            # Remove all edges with weight of 0 since we have no placeholder for "this edge doesn't exist" in the input file
             [edge for edge in dag.edges() if dag.get_edge_data(*edge)['weight'] == '0']
         )
         # Change 0-based node labels to 1-based
@@ -172,20 +182,27 @@ def generate_argparser():
     parser = argparse.ArgumentParser(description="A tool for finding HEFT schedules for given DAG task graphs")
     parser.add_argument("dag_file", help="File to read input DAG from", type=str)
     parser.add_argument("-l", "--loglevel", help="The log level to be used in this module. Default: INFO", type=str, dest="loglevel", choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"], default="INFO")
-    parser.add_argument("--showGraph", help="Switch used to enable graph display with matplotlib", dest="showGraph", action="store_true")
+    parser.add_argument("--showDAG", help="Switch used to enable display of the incoming task DAG", dest="showDAG", action="store_true")
+    parser.add_argument("--showGantt", help="Switch used to enable display of the final scheduled Gantt chart", dest="showGantt", action="store_true")
     return parser
 
 if __name__ == "__main__":
     argparser = generate_argparser()
     args = argparser.parse_args()
 
-    logging.basicConfig(format="%(levelname)8s : %(name)16s : %(message)s", level=logging.getLevelName(args.loglevel))
+    logger.setLevel(logging.getLevelName(args.loglevel))
+
+    consolehandler = logging.StreamHandler()
+    consolehandler.setLevel(logging.getLevelName(args.loglevel))
+    consolehandler.setFormatter(logging.Formatter("%(levelname)8s : %(name)16s : %(message)s"))
+
+    logger.addHandler(consolehandler)
 
     heftEnv = HEFT_Environment()
-    dag = readDagMatrix(args.dag_file, args.showGraph)
+    dag = readDagMatrix(args.dag_file, args.showDAG)
     processor_schedules, _ = heftEnv.schedule_dag(dag)
-    print(processor_schedules)
     for proc, jobs in processor_schedules.items():
         logger.info(f"Processor {proc} has the following jobs:")
         logger.info(f"\t{jobs}")
-
+    if args.showGantt:
+        ShowGanttChart(processor_schedules)
