@@ -12,7 +12,7 @@ import networkx as nx
 
 logger = logging.getLogger('heft')
 
-ScheduleEvent = namedtuple('ScheduleEvent', 'task start end')
+ScheduleEvent = namedtuple('ScheduleEvent', 'task start end proc')
 
 class HEFT_Environment:
     """
@@ -49,56 +49,104 @@ class HEFT_Environment:
     def __init__(self, computation_matrix=W0, communication_matrix=C0):
         self.computation_matrix = computation_matrix
         self.communication_matrix = communication_matrix
-        self.job_schedules = {}
+        #Task to ScheduleEvent
+        self.task_schedules = {}
+        #PE to list of ScheduleEvents
+        self.proc_schedules = {}
         for i in range(1, len(self.computation_matrix)+1):
-            self.job_schedules[i] = None
+            self.task_schedules[i] = None
+        for i in range(1, len(self.communication_matrix)+1):
+            self.proc_schedules[i] = []
 
-    def compute_ranku(self, dag, terminal_node):
+    def schedule_dag(self, dag):
+        # Nodes with no successors cause the any expression to be empty
+        terminal_node = [node for node in dag.nodes() if not any(True for _ in dag.successors(node))]
+        assert len(terminal_node) == 1, f"Expected a single terminal node, found {len(terminal_node)}"
+        terminal_node = terminal_node[0]
+
+        self._compute_ranku(dag, terminal_node)
+
+        sorted_nodes = sorted(dag.nodes(), key=lambda node: dag.nodes()[node]['ranku'], reverse=True)
+        for node in sorted_nodes:
+            minTaskSchedule = ScheduleEvent(node, inf, inf, -1)
+            for proc in range(1, len(self.communication_matrix)+1):
+                taskschedule = self._compute_eft(dag, node, proc)
+                if (taskschedule.end < minTaskSchedule.end):
+                    minTaskSchedule = taskschedule
+            self.task_schedules[node] = minTaskSchedule
+            self.proc_schedules[minTaskSchedule.proc].append(minTaskSchedule)
+            self.proc_schedules[minTaskSchedule.proc] = sorted(self.proc_schedules[minTaskSchedule.proc], key=lambda schedule_event: schedule_event.start)
+            logger.debug(f"task_schedules and proc_schedules now\n\ttask_schedules:{self.task_schedules}\n\tproc_schedules{self.proc_schedules}")
+            for proc in range(1, len(self.proc_schedules) + 1):
+                for job in range(len(self.proc_schedules[proc])-1):
+                    first_end = self.proc_schedules[proc][job].end
+                    second_start = self.proc_schedules[proc][job+1].start
+                    assert first_end <= second_start, \
+                    f"Jobs on a particular processor must finish before the next can begin, but one job ends at {first_end} and its successor starts at {second_start}"
+        
+        return self.proc_schedules, self.task_schedules
+    
+    def _compute_ranku(self, dag, terminal_node):
+        """
+        Uses a basic BFS approach to traverse upwards through the graph assigning ranku along the way
+        """
         nx.set_node_attributes(dag, { terminal_node: np.mean(self.computation_matrix[terminal_node-1]) }, "ranku")
         visit_queue = deque(dag.predecessors(terminal_node))
 
         while visit_queue:
             node = visit_queue.pop()
-            logger.debug("Assigning ranku for node: %s" % node)
+            logger.debug(f"Assigning ranku for node: {node}")
             max_successor_ranku = -1
             for succnode in dag.successors(node):
-                logger.debug('\tLooking at successor node: %s' % succnode)
+                logger.debug(f"\tLooking at successor node: {succnode}")
                 val = float(dag[node][succnode]['weight']) + dag.nodes()[succnode]['ranku']
                 if val > max_successor_ranku:
                     max_successor_ranku = val
-            assert max_successor_ranku > 0, "Expected maximum successor ranku to be greater than 0 but was %s" % max_successor_ranku
+            assert max_successor_ranku > 0, f"Expected maximum successor ranku to be greater than 0 but was {max_successor_ranku}"
             nx.set_node_attributes(dag, { node: np.mean(self.computation_matrix[node-1]) + max_successor_ranku }, "ranku")
 
             visit_queue.extendleft([prednode for prednode in dag.predecessors(node) if prednode not in visit_queue])
         
         for node in dag.nodes():
-            logger.info("Node: %s, Rank U: %s" % (node, dag.nodes()[node]['ranku']))
+            logger.debug(f"Node: {node}, Rank U: {dag.nodes()[node]['ranku']}")
 
-    def compute_eft(self, dag, node, proc):
-        readytime = 0
-        for prednode in dag.predecessors(node):
-            assert self.job_schedules[prednode] != None, "Predecessor nodes must be scheduled before their children"
-            readytimetemp = self.job_schedules[prednode].end + self.communication_matrix
+    def _compute_eft(self, dag, node, proc):
+        ready_time = 0
+        logger.debug(f"Computing EFT for node {node} on processor {proc}")
+        for prednode in list(dag.predecessors(node)):
+            predjob = self.task_schedules[prednode]
+            assert predjob != None, f"Predecessor nodes must be scheduled before their children, but node {node} has an unscheduled predecessor of {predjob}"
+            logger.debug(f"\tLooking at predecessor node {prednode} with job {predjob} to determine ready time")
+            ready_time_t = predjob.end + self.communication_matrix[predjob.proc-1, proc-1]
+            if ready_time_t > ready_time:
+                ready_time = ready_time_t
+        if ready_time == 0:
+            assert len(list(dag.predecessors(node))) is 0, f"Only nodes without predecessors should have a ready time of 0, but node {node} has predecessors {list(dag.predecessors(node))}"
+        logger.debug(f"\tReady time determined to be {ready_time}")
 
-
-    def schedule_dag(self, dag):
-        # Nodes with no successors cause the any expression to be empty
-        terminal_node = [node for node in dag.nodes() if not any(True for _ in dag.successors(node))]
-        assert len(terminal_node) == 1, "Expected a single terminal node, found %s" % len(terminal_node)
-        terminal_node = terminal_node[0]
-
-        self.compute_ranku(dag, terminal_node)
-
-        sorted_nodes = sorted(dag.nodes(), key=lambda node: dag.nodes()[node]['ranku'], reverse=True)
-        for node in sorted_nodes:
-            minTaskSchedule = ScheduleEvent(node, inf, inf)
-            for proc in range(1, len(self.computation_matrix[node-1])+1):
-                taskschedule = self.compute_eft(dag, node, proc)
-                if (taskschedule.end < minTaskSchedule.end):
-                    minTaskSchedule = taskschedule
-            self.job_schedules[proc].append(minTaskSchedule)
-            #for p in range(len(self.computation_matrix[node-1])):
-            #TODO: Implement EFT(ni, pk) using insertion-based scheduling policy
+        computation_time = self.computation_matrix[node-1, proc-1]
+        job_list = self.proc_schedules[proc]
+        for idx in range(len(job_list)):
+            prev_job = job_list[idx]
+            if idx == len(job_list)-1:
+                job_start = max(ready_time, prev_job.end)
+                min_schedule = ScheduleEvent(node, job_start, job_start + computation_time, proc)
+                break
+            next_job = job_list[idx+1]
+            #Start of next job - computation time == latest we can start in this window
+            #Max(ready_time, previous job's end) == earliest we can start in this window
+            #If there's space in there, schedule in it
+            logging.debug(f"\tLooking to fit a job of length {computation_time} into a slot of size {next_job.start - max(ready_time, prev_job.end)}")
+            if (next_job.start - computation_time) - max(ready_time, prev_job.end) >= 0:
+                logging.debug("\tIt looks like I can pull it off!")
+                job_start = max(ready_time, prev_job.end)
+                min_schedule = ScheduleEvent(node, job_start, job_start + computation_time, proc)
+                break
+        else:
+            #For-else loop: the else executes if the for loop exits without break-ing, which in this case means the number of jobs on this processor are 0
+            min_schedule = ScheduleEvent(node, ready_time, ready_time + computation_time, proc)
+        logging.debug(f"\tFor node {node} on processor {proc}, the EFT is {min_schedule}")
+        return min_schedule    
 
 def readDagMatrix(dag_file, show_dag=False):
     with open(dag_file) as fd:
@@ -135,4 +183,9 @@ if __name__ == "__main__":
 
     heftEnv = HEFT_Environment()
     dag = readDagMatrix(args.dag_file, args.showGraph)
-    heftEnv.schedule_dag(dag)
+    processor_schedules, _ = heftEnv.schedule_dag(dag)
+    print(processor_schedules)
+    for proc, jobs in processor_schedules.items():
+        logger.info(f"Processor {proc} has the following jobs:")
+        logger.info(f"\t{jobs}")
+
