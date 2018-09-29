@@ -106,8 +106,10 @@ class HEFT_Environment:
         while visit_queue:
             node = visit_queue.pop()
             while self._node_can_be_processed(dag, node) is not True:
-                node2 = visit_queue.pop() or None
-                assert node2 != None, f"Node {node} cannot be processed, and there are no other nodes in the queue to process instead!"
+                try:
+                    node2 = visit_queue.pop()
+                except IndexError:
+                    raise RuntimeError(f"Node {node} cannot be processed, and there are no other nodes in the queue to process instead!")
                 visit_queue.appendleft(node)
                 node = node2
 
@@ -140,6 +142,7 @@ class HEFT_Environment:
         """
         for succnode in dag.successors(node):
             if 'ranku' not in dag.nodes()[succnode]:
+                logger.debug(f"Attempted to compute the Rank U for node {node} but found that it has an unprocessed successor {dag.nodes()[succnode]}. Will try with the next node in the queue")
                 return False
         return True
 
