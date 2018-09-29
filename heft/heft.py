@@ -1,4 +1,4 @@
-"""Core code to be used for scheduling a given DAG"""
+"""Core code to be used for scheduling a task DAG with HEFT"""
 
 from collections import deque, namedtuple
 from math import inf
@@ -40,6 +40,8 @@ class HEFT_Environment:
     """
     Default communication matrix - not listed in Topcuoglu 2002 HEFT paper
     communication matrix: q x q matrix with q PEs
+
+    Note that a communication cost of 0 is used for a given processor to itself
     """
     C0 = np.matrix([
         [0, 1, 1],
@@ -128,6 +130,13 @@ class HEFT_Environment:
     def _node_can_be_processed(self, dag, node):
         """
         Validates that a node is able to be processed in Rank U calculations. Namely, that all of its successors have their Rank U values properly assigned
+        Otherwise, errors can occur in processing DAGs of the form
+        A
+        |\
+        | B
+        |/
+        C
+        Where C enqueues A and B, A is popped off, and it is unable to be processed because B's Rank U has not been computed
         """
         for succnode in dag.successors(node):
             if 'ranku' not in dag.nodes()[succnode]:
@@ -146,7 +155,10 @@ class HEFT_Environment:
             predjob = self.task_schedules[prednode]
             assert predjob != None, f"Predecessor nodes must be scheduled before their children, but node {node} has an unscheduled predecessor of {predjob}"
             logger.debug(f"\tLooking at predecessor node {prednode} with job {predjob} to determine ready time")
-            ready_time_t = predjob.end + self.communication_matrix[predjob.proc-1, proc-1] * float(dag[predjob.task][node]['weight'])
+            if self.communication_matrix[predjob.proc-1, proc-1] == 0:
+                ready_time_t = predjob.end
+            else:
+                ready_time_t = predjob.end + dag[predjob.task][node]['weight'] / self.communication_matrix[predjob.proc-1, proc-1]
             logger.debug(f"\tNode {prednode} can have its data routed to processor {proc} by time {ready_time_t}")
             if ready_time_t > ready_time:
                 ready_time = ready_time_t
@@ -220,12 +232,24 @@ def readDagMatrix(dag_file, show_dag=False):
 
 def generate_argparser():
     parser = argparse.ArgumentParser(description="A tool for finding HEFT schedules for given DAG task graphs")
-    parser.add_argument("dag_file", help="File containing input DAG to be scheduled", type=str)
-    parser.add_argument("-p", "--pe_connectivity_file", help="File containing connectivity/bandwidth information about PEs. Uses a default 3x3 matrix from Topcuoglu 2002 if none given.", type=str, default=None)
-    parser.add_argument("-t", "--task_execution_file", help="File containing execution times of each task on each particular PE. Uses a default 10x3 matrix from Topcuoglu 2002 if none given.", type=str, default=None)
-    parser.add_argument("-l", "--loglevel", help="The log level to be used in this module. Default: INFO", type=str, dest="loglevel", choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"], default="INFO")
-    parser.add_argument("--showDAG", help="Switch used to enable display of the incoming task DAG", dest="showDAG", action="store_true")
-    parser.add_argument("--showGantt", help="Switch used to enable display of the final scheduled Gantt chart", dest="showGantt", action="store_true")
+    parser.add_argument("-d", "--dag_file", 
+                        help="File containing input DAG to be scheduled. Uses default 10 node dag from Topcuoglu 2002 if none given.", 
+                        type=str, default="test/canonicalgraph_task_connectivity.csv")
+    parser.add_argument("-p", "--pe_connectivity_file", 
+                        help="File containing connectivity/bandwidth information about PEs. Uses a default 3x3 matrix from Topcuoglu 2002 if none given.", 
+                        type=str, default="test/canonicalgraph_resource_BW.csv")
+    parser.add_argument("-t", "--task_execution_file", 
+                        help="File containing execution times of each task on each particular PE. Uses a default 10x3 matrix from Topcuoglu 2002 if none given.", 
+                        type=str, default="test/canonicalgraph_task_exe_time.csv")
+    parser.add_argument("-l", "--loglevel", 
+                        help="The log level to be used in this module. Default: INFO", 
+                        type=str, default="INFO", dest="loglevel", choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"])
+    parser.add_argument("--showDAG", 
+                        help="Switch used to enable display of the incoming task DAG", 
+                        dest="showDAG", action="store_true")
+    parser.add_argument("--showGantt", 
+                        help="Switch used to enable display of the final scheduled Gantt chart", 
+                        dest="showGantt", action="store_true")
     return parser
 
 if __name__ == "__main__":
@@ -238,16 +262,12 @@ if __name__ == "__main__":
     consolehandler.setFormatter(logging.Formatter("%(levelname)8s : %(name)16s : %(message)s"))
     logger.addHandler(consolehandler)
 
-    heftArgs = {}
-    if args.pe_connectivity_file:
-        communication_matrix = readCsvToNumpyMatrix(args.pe_connectivity_file)
-        heftArgs['communication_matrix'] = communication_matrix
-    if args.task_execution_file:
-        computation_matrix = readCsvToNumpyMatrix(args.task_execution_file)
-        heftArgs['computation_matrix'] = computation_matrix
-    heftEnv = HEFT_Environment(**heftArgs)
-
+    communication_matrix = readCsvToNumpyMatrix(args.pe_connectivity_file)
+    computation_matrix = readCsvToNumpyMatrix(args.task_execution_file)
     dag = readDagMatrix(args.dag_file, args.showDAG)
+
+    heftEnv = HEFT_Environment(computation_matrix=computation_matrix, communication_matrix=communication_matrix)
+     
     processor_schedules, _ = heftEnv.schedule_dag(dag)
     for proc, jobs in processor_schedules.items():
         logger.info(f"Processor {proc} has the following jobs:")
