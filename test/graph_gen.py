@@ -1,5 +1,5 @@
-from graphviz import Digraph
-from graphviz import render
+# from graphviz import Digraph
+# from graphviz import render
 import numpy as np
 import random as rndm
 import copy
@@ -23,10 +23,10 @@ def split_number(number, parts):
                 	count_per_part.extend([tmp2])
 
 	        count_per_part.extend([number-sum(count_per_part)])
-        	#print "MIN", min(count_per_part)
+        	#print("MIN", min(count_per_part))
 	        if min(count_per_part) <= 0 :
         	        count_per_part = []
-                	print "sampling error"
+                	print("sampling error")
 	return count_per_part
 resource_count = 3
 graph_height = 6
@@ -41,10 +41,10 @@ bw_range = [10,100]
 with open("graph.config","r") as f:
 	config = f.readlines()
 config = [(x.strip()).split() for x in config]
-#print config
+#print(config)
 SEED = 1000
 for x in config:
-	#print x
+	#print(x)
 	if len(x) == 0:
 		continue
 	if    x[0] == "RC": resource_count = int(x[1])
@@ -64,7 +64,7 @@ for x in config:
 
 
 if (HF <0) or (HF>1):
-	print "0 <= (Heterogenity Factor(HF)) < 1"
+	print("0 <= (Heterogenity Factor(HF)) < 1")
 	exit()
 vertex_count = vertex_count
 graph_height = graph_height
@@ -72,10 +72,10 @@ graph_height = graph_height
 
 np.random.seed(SEED)
 rndm.seed(SEED)
-print "SEED=", SEED
+print("SEED=", SEED)
 nodes_list = []
 if vertex_count< graph_height:
-	print "Number of nodes are smaller than graph height"
+	print("Number of nodes are smaller than graph height")
 	exit()
 resource_com_bw = np.zeros((resource_count,resource_count))
 #set communication bandwidth among resources
@@ -90,7 +90,7 @@ for i in range(resource_count):
 
 
 
-#print resource_com_bw
+#print(resource_com_bw)
 #start with one node in the graph
 node_count_per_level = [1]
 #number of nodes per level
@@ -100,8 +100,8 @@ node_count_per_level.extend([1])
 
 
 
-#print node_count_per_level
-#print sum(node_count_per_level)
+#print(node_count_per_level)
+#print(sum(node_count_per_level))
 
 level_nodes_list = []
 count = 0
@@ -118,7 +118,7 @@ for level in range(len(node_count_per_level)):
 			out_edge_count_to_next_level = split_number(node_count_per_level[level+1] , elem)
 	else:
 		out_edge_count_to_next_level = list(np.zeros((elem)))
-	#print "OUT",out_edge_count_to_next_level
+	#print("OUT",out_edge_count_to_next_level)
 		
 	for i in range(elem):
 		tmp1.extend([graph_node(count, level, int(out_edge_count_to_next_level[i]))])
@@ -127,9 +127,9 @@ for level in range(len(node_count_per_level)):
 		nodes_list.extend([elem1])
 	level_nodes_list.append(tmp1)	
 #for level in range(len(level_nodes_list)):	
-#	print "Level", level
+#	print("Level", level)
 #	for elem in level_nodes_list[level]:
-#		print elem.task_id, elem.level, elem.outgoing_edge_count
+#		print(elem.task_id, elem.level, elem.outgoing_edge_count)
 
 tmp = 0
 #make actual connections among the nodes in adjacent levels
@@ -151,7 +151,7 @@ while tmp != graph_height:
 			nodes_list[elem].outgoing_edge_weight.extend([rndm.randint(edge_weight_range[0], edge_weight_range[1])])
 			l1_tmp.remove(tmp1)
 			if len(l1_tmp)	== 0:
-				#print "EMPTY"
+				#print("EMPTY")
 				l1_tmp = copy.deepcopy(l1)
 	tmp =tmp + 1				
 		
@@ -177,7 +177,7 @@ for elem in nodes_list:
 	#if elem.level != (graph_height-2)	
 
 	#pmean = 2.0/ (float(graph_height - elem.level - 1 ))
-	#print "pmean", pmean
+	#print("pmean", pmean)
 	new_nodes_to_connect = []
 	for i in range (tmp1 - elem.outgoing_edge_count):
 		tmp2 = rndm.choice(l1)	
@@ -187,9 +187,9 @@ for elem in nodes_list:
 		dist_level = 0
 		while dist_level<=0 or dist_level > (graph_height-elem.level-1) :
 			dist_level = np.random.geometric(pmean)
-			#print  "pmean",pmean, dist_level, elem.level
+			#print ("pmean",pmean, dist_level, elem.level)
 		dist_level = dist_level + elem.level  
-		print "pmean1", tmp1, elem.outgoing_edge_count, pmean, dist_level, elem.level
+		print("pmean1", tmp1, elem.outgoing_edge_count, pmean, dist_level, elem.level)
 		'''
 		'''
 		l1 = []
@@ -209,13 +209,13 @@ for elem in nodes_list:
 link_bw = [] 
 for i in range(len(resource_com_bw)):	
 	for j in range(len(resource_com_bw[i])):
-		print i, j
+		print(i, j)
 		if (i==j):
 			break
 		else:
 			link_bw.extend([resource_com_bw[i][j]])
 
-print link_bw
+print(link_bw)
 
 #assign computation time to each node on different resources
 for elem in nodes_list:
@@ -251,7 +251,7 @@ for elem in nodes_list:
 	for elem1 in range(len(elem.outgoing_edge_node)):
 		connect_matrix[elem.task_id][elem.outgoing_edge_node[elem1]] = elem.outgoing_edge_weight[elem1]
 
-#print connect_matrix
+#print(connect_matrix)
 
 		
 			
@@ -265,10 +265,10 @@ for elem in nodes_list:
 	
 			
 for level in range(len(level_nodes_list)):	
-	print "Level", level
+	print("Level", level)
 	for elem in level_nodes_list[level]:
-		print elem.task_id, elem.level, elem.outgoing_edge_count, elem.outgoing_edge_node, elem.outgoing_edge_weight, elem.resource_exe_time
-#print len(nodes_list)
+		print(elem.task_id, elem.level, elem.outgoing_edge_count, elem.outgoing_edge_node, elem.outgoing_edge_weight, elem.resource_exe_time)
+#print(len(nodes_list))
 
 
 ##write resource to resource bandwidth
@@ -283,8 +283,8 @@ for i in range(resource_count):
 	for j in range(resource_count):
 		tmp.extend([resource_com_bw[i][j]])
 	write_data.append(tmp)
-#print write_data
-with open("resource_BW.csv", "wb") as f:
+#print(write_data)
+with open("resource_BW.csv", "w") as f:
     writer = csv.writer(f)
     writer.writerows(write_data)
 ###write connectivity matrix with data transfer size
@@ -298,8 +298,8 @@ for i in range(task_count):
         for j in range(task_count):
                 tmp.extend([connect_matrix[i][j]])
         write_data.append(tmp)
-#print write_data
-with open("task_connectivity.csv", "wb") as f:
+#print(write_data)
+with open("task_connectivity.csv", "w") as f:
     writer = csv.writer(f)
     writer.writerows(write_data)
 
@@ -314,7 +314,7 @@ for i in range(len(nodes_list)):
 	for j in range(resource_count):
 		tmp.extend([nodes_list[i].resource_exe_time[j]])
 	write_data.append(tmp)
-with open("task_exe_time.csv", "wb") as f:
+with open("task_exe_time.csv", "w") as f:
     writer = csv.writer(f)
     writer.writerows(write_data)
 
@@ -325,27 +325,27 @@ with open("task_exe_time.csv", "wb") as f:
 
 
 
-#exit()	
+# exit()	
 	
 
 
 
 
-dot = Digraph()
-for elem in nodes_list:	
+# dot = Digraph()
+# for elem in nodes_list:	
 	#dot.node('t'+str(elem.task_id), 't'+str(elem.task_id))
-	dot.node('T_'+str(elem.task_id))
-edges = []
-for elem in nodes_list:
-	for elem1 in elem.outgoing_edge_node:
+	# dot.node('T_'+str(elem.task_id))
+# edges = []
+# for elem in nodes_list:
+	# for elem1 in elem.outgoing_edge_node:
 		#edges.extend(['t'+str(elem.task_id)+'t'+str(nodes_list[elem1].task_id)])	
-		dot.edge('T_'+str(elem.task_id), 'T_'+str(nodes_list[elem1].task_id))	
+		# dot.edge('T_'+str(elem.task_id), 'T_'+str(nodes_list[elem1].task_id))	
 #dot.edges(edges)	
-file_name= "/home/nirmalk/Documents/DASH_sim/graph_gen/graph_plot.gv"
-dot.render( file_name, view=True) 			
+# file_name= "/home/nirmalk/Documents/DASH_sim/graph_gen/graph_plot.gv"
+# dot.render( file_name, view=True) 			
 #render('dot', 'png', file_name) 			
 
 
 
-#print level_nodes_list
+#print(level_nodes_list)
 

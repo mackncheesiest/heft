@@ -1,1 +1,1 @@
-__all__ = ["heft"]
+__all__ = ["heft", "gantt"]

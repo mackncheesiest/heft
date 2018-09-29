@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import matplotlib.font_manager as font_manager
 import numpy as np
 
-def ShowGanttChart(proc_schedules):
+def showGanttChart(proc_schedules):
     """
         Given a dictionary of processor-task schedules, displays a Gantt chart generated using Matplotlib
     """  

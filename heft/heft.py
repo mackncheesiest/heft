@@ -1,8 +1,8 @@
-"""Core code to be used for scheduling a given DAG"""
+"""Core code to be used for scheduling a task DAG with HEFT"""
 
 from collections import deque, namedtuple
 from math import inf
-from gantt import ShowGanttChart
+from gantt import showGanttChart
 
 import argparse
 import logging
@@ -40,6 +40,8 @@ class HEFT_Environment:
     """
     Default communication matrix - not listed in Topcuoglu 2002 HEFT paper
     communication matrix: q x q matrix with q PEs
+
+    Note that a communication cost of 0 is used for a given processor to itself
     """
     C0 = np.matrix([
         [0, 1, 1],
@@ -65,8 +67,10 @@ class HEFT_Environment:
         assert len(terminal_node) == 1, f"Expected a single terminal node, found {len(terminal_node)}"
         terminal_node = terminal_node[0]
 
+        logger.debug(""); logger.debug("====================== Performing Rank-U Computation ======================\n"); logger.debug("")
         self._compute_ranku(dag, terminal_node)
 
+        logger.debug(""); logger.debug("====================== Computing EFT for each (task, processor) pair and scheduling in order of decreasing Rank-U ======================"); logger.debug("")
         sorted_nodes = sorted(dag.nodes(), key=lambda node: dag.nodes()[node]['ranku'], reverse=True)
         for node in sorted_nodes:
             minTaskSchedule = ScheduleEvent(node, inf, inf, -1)
@@ -101,6 +105,12 @@ class HEFT_Environment:
 
         while visit_queue:
             node = visit_queue.pop()
+            while self._node_can_be_processed(dag, node) is not True:
+                node2 = visit_queue.pop() or None
+                assert node2 != None, f"Node {node} cannot be processed, and there are no other nodes in the queue to process instead!"
+                visit_queue.appendleft(node)
+                node = node2
+
             logger.debug(f"Assigning ranku for node: {node}")
             max_successor_ranku = -1
             for succnode in dag.successors(node):
@@ -113,17 +123,43 @@ class HEFT_Environment:
 
             visit_queue.extendleft([prednode for prednode in dag.predecessors(node) if prednode not in visit_queue])
         
+        logger.debug("")
         for node in dag.nodes():
             logger.debug(f"Node: {node}, Rank U: {dag.nodes()[node]['ranku']}")
 
+    def _node_can_be_processed(self, dag, node):
+        """
+        Validates that a node is able to be processed in Rank U calculations. Namely, that all of its successors have their Rank U values properly assigned
+        Otherwise, errors can occur in processing DAGs of the form
+        A
+        |\
+        | B
+        |/
+        C
+        Where C enqueues A and B, A is popped off, and it is unable to be processed because B's Rank U has not been computed
+        """
+        for succnode in dag.successors(node):
+            if 'ranku' not in dag.nodes()[succnode]:
+                return False
+        return True
+
     def _compute_eft(self, dag, node, proc):
+        """
+        Computes the EFT of a particular node if it were scheduled on a particular processor
+        It does this by first looking at all predecessor tasks of a particular node and determining the earliest time a task would be ready for execution (ready_time)
+        It then looks at the list of tasks scheduled on this particular processor and determines the earliest time (after ready_time) a given node can be inserted into this processor's queue
+        """
         ready_time = 0
         logger.debug(f"Computing EFT for node {node} on processor {proc}")
         for prednode in list(dag.predecessors(node)):
             predjob = self.task_schedules[prednode]
             assert predjob != None, f"Predecessor nodes must be scheduled before their children, but node {node} has an unscheduled predecessor of {predjob}"
             logger.debug(f"\tLooking at predecessor node {prednode} with job {predjob} to determine ready time")
-            ready_time_t = predjob.end + self.communication_matrix[predjob.proc-1, proc-1] * float(dag[predjob.task][node]['weight'])
+            if self.communication_matrix[predjob.proc-1, proc-1] == 0:
+                ready_time_t = predjob.end
+            else:
+                ready_time_t = predjob.end + dag[predjob.task][node]['weight'] / self.communication_matrix[predjob.proc-1, proc-1]
+            logger.debug(f"\tNode {prednode} can have its data routed to processor {proc} by time {ready_time_t}")
             if ready_time_t > ready_time:
                 ready_time = ready_time_t
         if ready_time == 0:
@@ -154,36 +190,66 @@ class HEFT_Environment:
         logger.debug(f"\tFor node {node} on processor {proc}, the EFT is {min_schedule}")
         return min_schedule    
 
+def readCsvToNumpyMatrix(csv_file):
+    """
+    Given an input file consisting of a comma separated list of numeric values with a single header row and header column, 
+    this function reads that data into a numpy matrix and strips the top row and leftmost column
+    """
+    with open(csv_file) as fd:
+        logger.debug(f"Reading the contents of {csv_file} into a matrix")
+        contents = fd.read()
+        contentsList = contents.split('\n')
+        contentsList = list(map(lambda line: line.split(','), contentsList))
+        contentsList = contentsList[0:len(contentsList)-1] if contentsList[len(contentsList)-1] == [''] else contentsList
+        
+        matrix = np.matrix(contentsList)
+        matrix = np.delete(matrix, 0, 0) # delete the first row (entry 0 along axis 0)
+        matrix = np.delete(matrix, 0, 1) # delete the first column (entry 0 along axis 1)
+        matrix = matrix.astype(float)
+        logger.debug(f"After deleting the first row and column of input data, we are left with this matrix:\n{matrix}")
+        return matrix
+
 def readDagMatrix(dag_file, show_dag=False):
     """
     Given an input file consisting of a connectivity matrix, reads and parses it into a networkx Directional Graph (DiGraph)
     """
     #TODO: Migrate this to use our newer CSV format
-    with open(dag_file) as fd:
-        contents = fd.read()
-        contentsList = contents.split('\n')
-        contentsList = list(map(lambda line: line.split(' '), contentsList))
-        
-        dag = nx.DiGraph(np.matrix(contentsList))
-        dag.remove_edges_from(
-            # Remove all edges with weight of 0 since we have no placeholder for "this edge doesn't exist" in the input file
-            [edge for edge in dag.edges() if dag.get_edge_data(*edge)['weight'] == '0']
-        )
-        # Change 0-based node labels to 1-based
-        dag = nx.relabel_nodes(dag, dict(map(lambda node: (node, node+1), list(dag.nodes()))))
+    matrix = readCsvToNumpyMatrix(dag_file)
 
-        if show_dag:
-            nx.draw(dag, with_labels=True)
-            plt.show()
+    dag = nx.DiGraph(matrix)
+    dag.remove_edges_from(
+        # Remove all edges with weight of 0 since we have no placeholder for "this edge doesn't exist" in the input file
+        [edge for edge in dag.edges() if dag.get_edge_data(*edge)['weight'] == '0.0']
+    )
+    # Change 0-based node labels to 1-based
+    dag = nx.relabel_nodes(dag, dict(map(lambda node: (node, node+1), list(dag.nodes()))))
 
-        return dag
+    if show_dag:
+        nx.draw(dag, with_labels=True)
+        plt.show()
+
+    return dag
 
 def generate_argparser():
     parser = argparse.ArgumentParser(description="A tool for finding HEFT schedules for given DAG task graphs")
-    parser.add_argument("dag_file", help="File to read input DAG from", type=str)
-    parser.add_argument("-l", "--loglevel", help="The log level to be used in this module. Default: INFO", type=str, dest="loglevel", choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"], default="INFO")
-    parser.add_argument("--showDAG", help="Switch used to enable display of the incoming task DAG", dest="showDAG", action="store_true")
-    parser.add_argument("--showGantt", help="Switch used to enable display of the final scheduled Gantt chart", dest="showGantt", action="store_true")
+    parser.add_argument("-d", "--dag_file", 
+                        help="File containing input DAG to be scheduled. Uses default 10 node dag from Topcuoglu 2002 if none given.", 
+                        type=str, default="test/canonicalgraph_task_connectivity.csv")
+    parser.add_argument("-p", "--pe_connectivity_file", 
+                        help="File containing connectivity/bandwidth information about PEs. Uses a default 3x3 matrix from Topcuoglu 2002 if none given.", 
+                        type=str, default="test/canonicalgraph_resource_BW.csv")
+    parser.add_argument("-t", "--task_execution_file", 
+                        help="File containing execution times of each task on each particular PE. Uses a default 10x3 matrix from Topcuoglu 2002 if none given.", 
+                        type=str, default="test/canonicalgraph_task_exe_time.csv")
+    parser.add_argument("-l", "--loglevel", 
+                        help="The log level to be used in this module. Default: INFO", 
+                        type=str, default="INFO", dest="loglevel", choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"])
+    parser.add_argument("--showDAG", 
+                        help="Switch used to enable display of the incoming task DAG", 
+                        dest="showDAG", action="store_true")
+    parser.add_argument("--showGantt", 
+                        help="Switch used to enable display of the final scheduled Gantt chart", 
+                        dest="showGantt", action="store_true")
     return parser
 
 if __name__ == "__main__":
@@ -191,18 +257,20 @@ if __name__ == "__main__":
     args = argparser.parse_args()
 
     logger.setLevel(logging.getLevelName(args.loglevel))
-
     consolehandler = logging.StreamHandler()
     consolehandler.setLevel(logging.getLevelName(args.loglevel))
     consolehandler.setFormatter(logging.Formatter("%(levelname)8s : %(name)16s : %(message)s"))
-
     logger.addHandler(consolehandler)
 
-    heftEnv = HEFT_Environment()
+    communication_matrix = readCsvToNumpyMatrix(args.pe_connectivity_file)
+    computation_matrix = readCsvToNumpyMatrix(args.task_execution_file)
     dag = readDagMatrix(args.dag_file, args.showDAG)
+
+    heftEnv = HEFT_Environment(computation_matrix=computation_matrix, communication_matrix=communication_matrix)
+     
     processor_schedules, _ = heftEnv.schedule_dag(dag)
     for proc, jobs in processor_schedules.items():
         logger.info(f"Processor {proc} has the following jobs:")
         logger.info(f"\t{jobs}")
     if args.showGantt:
-        ShowGanttChart(processor_schedules)
+        showGanttChart(processor_schedules)
