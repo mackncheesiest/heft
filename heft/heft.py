@@ -117,6 +117,7 @@ class HEFT_Environment:
             max_successor_ranku = -1
             for succnode in dag.successors(node):
                 logger.debug(f"\tLooking at successor node: {succnode}")
+                logger.debug(f"\tThe edge weight from node {node} to node {succnode} is {dag[node][succnode]['weight']}, and the ranku for node {node} is {dag.nodes()[succnode]['ranku']}")
                 val = float(dag[node][succnode]['weight']) + dag.nodes()[succnode]['ranku']
                 if val > max_successor_ranku:
                     max_successor_ranku = val
@@ -212,11 +213,10 @@ def readCsvToNumpyMatrix(csv_file):
         logger.debug(f"After deleting the first row and column of input data, we are left with this matrix:\n{matrix}")
         return matrix
 
-def readDagMatrix(dag_file, show_dag=False):
+def readDagMatrix(dag_file, communication_matrix, show_dag=False):
     """
     Given an input file consisting of a connectivity matrix, reads and parses it into a networkx Directional Graph (DiGraph)
     """
-    #TODO: Migrate this to use our newer CSV format
     matrix = readCsvToNumpyMatrix(dag_file)
 
     dag = nx.DiGraph(matrix)
@@ -226,6 +226,11 @@ def readDagMatrix(dag_file, show_dag=False):
     )
     # Change 0-based node labels to 1-based
     dag = nx.relabel_nodes(dag, dict(map(lambda node: (node, node+1), list(dag.nodes()))))
+
+    avgCommunicationCost = np.mean(communication_matrix[np.where(communication_matrix > 0)])
+    for edge in dag.edges():
+        logger.debug(f"Adjusting edge {edge}'s weight based on average communication cost from {float(dag.get_edge_data(*edge)['weight'])} to {float(dag.get_edge_data(*edge)['weight']) / avgCommunicationCost}")
+        nx.set_edge_attributes(dag, { edge: float(dag.get_edge_data(*edge)['weight']) / avgCommunicationCost }, 'weight')
 
     if show_dag:
         nx.draw(dag, with_labels=True)
@@ -267,7 +272,8 @@ if __name__ == "__main__":
 
     communication_matrix = readCsvToNumpyMatrix(args.pe_connectivity_file)
     computation_matrix = readCsvToNumpyMatrix(args.task_execution_file)
-    dag = readDagMatrix(args.dag_file, args.showDAG)
+
+    dag = readDagMatrix(args.dag_file, communication_matrix, args.showDAG)
 
     heftEnv = HEFT_Environment(computation_matrix=computation_matrix, communication_matrix=communication_matrix)
      
