@@ -117,8 +117,8 @@ class HEFT_Environment:
             max_successor_ranku = -1
             for succnode in dag.successors(node):
                 logger.debug(f"\tLooking at successor node: {succnode}")
-                logger.debug(f"\tThe edge weight from node {node} to node {succnode} is {dag[node][succnode]['weight']}, and the ranku for node {node} is {dag.nodes()[succnode]['ranku']}")
-                val = float(dag[node][succnode]['weight']) + dag.nodes()[succnode]['ranku']
+                logger.debug(f"\tThe edge weight from node {node} to node {succnode} is {dag[node][succnode]['avgweight']}, and the ranku for node {node} is {dag.nodes()[succnode]['ranku']}")
+                val = float(dag[node][succnode]['avgweight']) + dag.nodes()[succnode]['ranku']
                 if val > max_successor_ranku:
                     max_successor_ranku = val
             assert max_successor_ranku > 0, f"Expected maximum successor ranku to be greater than 0 but was {max_successor_ranku}"
@@ -227,11 +227,6 @@ def readDagMatrix(dag_file, communication_matrix, show_dag=False):
     # Change 0-based node labels to 1-based
     dag = nx.relabel_nodes(dag, dict(map(lambda node: (node, node+1), list(dag.nodes()))))
 
-    avgCommunicationCost = np.mean(communication_matrix[np.where(communication_matrix > 0)])
-    for edge in dag.edges():
-        logger.debug(f"Adjusting edge {edge}'s weight based on average communication cost from {float(dag.get_edge_data(*edge)['weight'])} to {float(dag.get_edge_data(*edge)['weight']) / avgCommunicationCost}")
-        nx.set_edge_attributes(dag, { edge: float(dag.get_edge_data(*edge)['weight']) / avgCommunicationCost }, 'weight')
-
     if show_dag:
         nx.draw(dag, with_labels=True)
         plt.show()
@@ -274,6 +269,11 @@ if __name__ == "__main__":
     computation_matrix = readCsvToNumpyMatrix(args.task_execution_file)
 
     dag = readDagMatrix(args.dag_file, communication_matrix, args.showDAG)
+
+    avgCommunicationCost = np.mean(communication_matrix[np.where(communication_matrix > 0)])
+    for edge in dag.edges():
+        logger.debug(f"Assigning {edge}'s average weight based on average communication cost. {float(dag.get_edge_data(*edge)['weight'])} => {float(dag.get_edge_data(*edge)['weight']) / avgCommunicationCost}")
+        nx.set_edge_attributes(dag, { edge: float(dag.get_edge_data(*edge)['weight']) / avgCommunicationCost }, 'avgweight')
 
     heftEnv = HEFT_Environment(computation_matrix=computation_matrix, communication_matrix=communication_matrix)
      
