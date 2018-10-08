@@ -77,9 +77,19 @@ time_offset = 0
 
 """
 Everything other than dag has a default value
+
 proc_schedules gives a dictionary with keys being processor number and values being lists of tasks on each processor
-task_schedules gives a dictioonary with keys being node number (the label in the dag) and the values being the task of a particular job, potentially relabeled
+
+task_schedules gives a dictionary with keys being node number (the label in the dag) and the values being the task of a particular job, potentially relabeled
 """
-proc_schedules, task_schedules = 
-  heft.schedule_dag(dag, communication_matrix=computation_matrix, computation_matrix=computation_matrix, proc_schedules=existing_schedules, time_offset=time_offset)
+proc_schedules, task_schedules, Nx2_matrix = 
+  heft.schedule_dag(
+    dag, 
+    communication_matrix=communication_matrix, 
+    computation_matrix=computation_matrix, 
+    proc_schedules=existing_schedules, 
+    time_offset=time_offset,
+    #If proc_schedules has schedules for nodes 1-10, then relabel your dag to be 11+
+    relabel_nodes=True
+  )
 ```
