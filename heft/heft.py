@@ -2,7 +2,7 @@
 
 from collections import deque, namedtuple
 from math import inf
-from gantt import showGanttChart
+from heft.gantt import showGanttChart
 from types import SimpleNamespace
 
 import argparse
@@ -45,15 +45,23 @@ C0 = np.matrix([
     [1, 1, 0]
 ])
 
-def schedule_dag(dag, computation_matrix=W0, communication_matrix=C0, proc_schedules={}, time_offset=0):
+def schedule_dag(dag, computation_matrix=W0, communication_matrix=C0, proc_schedules=None, time_offset=0, relabel_nodes=True):
+    """
+    Given an application DAG and a set of matrices specifying PE bandwidth and (task, pe) execution times, computes the HEFT schedule
+    of that DAG onto that set of PEs 
+    """
     avgCommunicationCost = np.mean(communication_matrix[np.where(communication_matrix > 0)])
     for edge in dag.edges():
         logger.debug(f"Assigning {edge}'s average weight based on average communication cost. {float(dag.get_edge_data(*edge)['weight'])} => {float(dag.get_edge_data(*edge)['weight']) / avgCommunicationCost}")
         nx.set_edge_attributes(dag, { edge: float(dag.get_edge_data(*edge)['weight']) / avgCommunicationCost }, 'avgweight')
     
+    if proc_schedules == None:
+        proc_schedules = {}
+
     numExistingJobs = 0
     for proc in proc_schedules:
         numExistingJobs = numExistingJobs + len(proc_schedules[proc])
+    
     _self = {
         'computation_matrix': computation_matrix,
         'communication_matrix': communication_matrix,
@@ -64,16 +72,19 @@ def schedule_dag(dag, computation_matrix=W0, communication_matrix=C0, proc_sched
     }
     _self = SimpleNamespace(**_self)
 
-    # Nodes with no successors cause the any expression to be empty
-    dag = nx.relabel_nodes(dag, dict(map(lambda node: (node, node+_self.numExistingJobs), list(dag.nodes()))))
-    #for i in range(_self.numExistingJobs, _self.numExistingJobs + len(dag.nodes())):
-    logger.warning(f"Nodes: {list(dag.nodes())}")
+    if relabel_nodes:
+        dag = nx.relabel_nodes(dag, dict(map(lambda node: (node, node+_self.numExistingJobs), list(dag.nodes()))))
+    else:
+        #Negates any offsets that would have been needed had the jobs been relabeled
+        _self.numExistingJobs = 0
+
     for i in range(len(_self.computation_matrix)):
         _self.task_schedules[i] = None
     for i in range(len(_self.communication_matrix)):
         if i not in _self.proc_schedules:
             _self.proc_schedules[i] = []
-    
+
+    # Nodes with no successors cause the any expression to be empty    
     terminal_node = [node for node in dag.nodes() if not any(True for _ in dag.successors(node))]
     assert len(terminal_node) == 1, f"Expected a single terminal node, found {len(terminal_node)}"
     terminal_node = terminal_node[0]
@@ -111,7 +122,7 @@ def _compute_ranku(_self, dag, terminal_node):
     """
     Uses a basic BFS approach to traverse upwards through the graph assigning ranku along the way
     """
-    nx.set_node_attributes(dag, { terminal_node: np.mean(computation_matrix[terminal_node-1-_self.numExistingJobs]) }, "ranku")
+    nx.set_node_attributes(dag, { terminal_node: np.mean(_self.computation_matrix[terminal_node-1-_self.numExistingJobs]) }, "ranku")
     visit_queue = deque(dag.predecessors(terminal_node))
 
     while visit_queue:
@@ -133,7 +144,7 @@ def _compute_ranku(_self, dag, terminal_node):
             if val > max_successor_ranku:
                 max_successor_ranku = val
         assert max_successor_ranku > 0, f"Expected maximum successor ranku to be greater than 0 but was {max_successor_ranku}"
-        nx.set_node_attributes(dag, { node: np.mean(computation_matrix[node-_self.numExistingJobs]) + max_successor_ranku }, "ranku")
+        nx.set_node_attributes(dag, { node: np.mean(_self.computation_matrix[node-_self.numExistingJobs]) + max_successor_ranku }, "ranku")
 
         visit_queue.extendleft([prednode for prednode in dag.predecessors(node) if prednode not in visit_queue])
     
@@ -230,7 +241,7 @@ def readCsvToNumpyMatrix(csv_file):
         logger.debug(f"After deleting the first row and column of input data, we are left with this matrix:\n{matrix}")
         return matrix
 
-def readDagMatrix(dag_file, communication_matrix, show_dag=False):
+def readDagMatrix(dag_file, show_dag=False):
     """
     Given an input file consisting of a connectivity matrix, reads and parses it into a networkx Directional Graph (DiGraph)
     """
@@ -241,8 +252,6 @@ def readDagMatrix(dag_file, communication_matrix, show_dag=False):
         # Remove all edges with weight of 0 since we have no placeholder for "this edge doesn't exist" in the input file
         [edge for edge in dag.edges() if dag.get_edge_data(*edge)['weight'] == '0.0']
     )
-    # Change 0-based node labels to 1-based
-    # dag = nx.relabel_nodes(dag, dict(map(lambda node: (node, node+1), list(dag.nodes()))))
 
     if show_dag:
         nx.draw(dag, with_labels=True)
@@ -284,7 +293,7 @@ if __name__ == "__main__":
 
     communication_matrix = readCsvToNumpyMatrix(args.pe_connectivity_file)
     computation_matrix = readCsvToNumpyMatrix(args.task_execution_file)
-    dag = readDagMatrix(args.dag_file, communication_matrix, args.showDAG) 
+    dag = readDagMatrix(args.dag_file, args.showDAG) 
     
     processor_schedules, _ = schedule_dag(dag, communication_matrix=communication_matrix, computation_matrix=computation_matrix)
     for proc, jobs in processor_schedules.items():
