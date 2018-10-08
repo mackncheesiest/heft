@@ -116,7 +116,13 @@ def schedule_dag(dag, computation_matrix=W0, communication_matrix=C0, proc_sched
                 assert first_end <= second_start, \
                 f"Jobs on a particular processor must finish before the next can begin, but one job ends at {first_end} and its successor starts at {second_start}"
     
-    return _self.proc_schedules, _self.task_schedules
+    matrix_output = np.zeros([len(_self.task_schedules), 2])
+    for _, task in _self.task_schedules.items():
+        index = _self.proc_schedules[task.proc].index(task)
+        matrix_output[task.task, 0] = task.proc
+        matrix_output[task.task, 1] = index
+
+    return _self.proc_schedules, _self.task_schedules, matrix_output
     
 def _compute_ranku(_self, dag, terminal_node):
     """
@@ -295,7 +301,7 @@ if __name__ == "__main__":
     computation_matrix = readCsvToNumpyMatrix(args.task_execution_file)
     dag = readDagMatrix(args.dag_file, args.showDAG) 
     
-    processor_schedules, _ = schedule_dag(dag, communication_matrix=communication_matrix, computation_matrix=computation_matrix)
+    processor_schedules, _, _ = schedule_dag(dag, communication_matrix=communication_matrix, computation_matrix=computation_matrix)
     for proc, jobs in processor_schedules.items():
         logger.info(f"Processor {proc} has the following jobs:")
         logger.info(f"\t{jobs}")
