@@ -23,7 +23,7 @@ def showGanttChart(proc_schedules):
     for idx, proc in enumerate(processors):
         for job in proc_schedules[proc]:
             ax.barh((idx*0.5)+0.5, job.end - job.start, left=job.start, height=0.3, align='center', edgecolor='black', color='white', alpha=0.95)
-            ax.text(0.5 * (job.start + job.end - len(str(job.task))-0.25), (idx*0.5)+0.5 - 0.03125, job.task+1, color=color_choices[(job.task) // 10], fontweight='bold', fontsize=18, alpha=0.75)
+            ax.text(0.5 * (job.start + job.end - len(str(job.task))-0.25), (idx*0.5)+0.5 - 0.03125, job.task+1, color=color_choices[((job.task) // 10) % 5], fontweight='bold', fontsize=18, alpha=0.75)
     
     locsy, labelsy = plt.yticks(pos, processors)
     plt.ylabel('Processor', fontsize=16)
