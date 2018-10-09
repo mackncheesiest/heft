@@ -19,7 +19,7 @@ Otherwise, the main dependencies are:
 - Networkx
 
 ### Usage
-Basic usage is given by `python heft/heft.py -h`
+Basic usage is given by `python -m heft.heft -h`
 
 ```
 usage: heft.py [-h] [-d DAG_FILE] [-p PE_CONNECTIVITY_FILE]                             
