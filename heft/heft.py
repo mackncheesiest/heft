@@ -20,7 +20,7 @@ ScheduleEvent = namedtuple('ScheduleEvent', 'task start end proc')
 Default computation matrix - taken from Topcuoglu 2002 HEFT paper
 computation matrix: v x q matrix with v tasks and q PEs
 """
-W0 = np.matrix([
+W0 = np.array([
     [14, 16, 9],
     [13, 19, 18],
     [11, 13, 19],
@@ -39,7 +39,7 @@ communication matrix: q x q matrix with q PEs
 
 Note that a communication cost of 0 is used for a given processor to itself
 """
-C0 = np.matrix([
+C0 = np.array([
     [0, 1, 1],
     [1, 0, 1],
     [1, 1, 0]
@@ -240,7 +240,7 @@ def readCsvToNumpyMatrix(csv_file):
         contentsList = list(map(lambda line: line.split(','), contentsList))
         contentsList = contentsList[0:len(contentsList)-1] if contentsList[len(contentsList)-1] == [''] else contentsList
         
-        matrix = np.matrix(contentsList)
+        matrix = np.array(contentsList)
         matrix = np.delete(matrix, 0, 0) # delete the first row (entry 0 along axis 0)
         matrix = np.delete(matrix, 0, 1) # delete the first column (entry 0 along axis 1)
         matrix = matrix.astype(float)

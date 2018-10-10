@@ -6,4 +6,5 @@ dependencies:
 - networkx=2.1
 - numpy=1.15.1
 - python=3.7.0
+- pytest=3.8.2
 

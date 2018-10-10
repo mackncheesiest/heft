@@ -7,7 +7,7 @@ A Python 3.6+ implementation of a heuristic DAG scheduling approach from
 [IEEE Explore Link](https://ieeexplore.ieee.org/document/993206)
 
 
-### Installation
+## Installation
 If you have conda installed, you can create an environment and fetch any necessary dependencies with
 
 `conda env create -f heft.yml`
@@ -17,8 +17,9 @@ Otherwise, the main dependencies are:
 - Matplotlib
 - Numpy
 - Networkx
+- Pytest (development dependency only)
 
-### Usage
+## Usage
 Basic usage is given by `python -m heft.heft -h`
 
 ```
@@ -57,7 +58,7 @@ With a generated Gantt chart available using
 
 `python -m heft.heft --showGantt`
 
-### Usage from an external library
+## Usage from an external library
 
 
 ```
@@ -67,22 +68,24 @@ pe_connectivity_file = 'test/canonicalgraph_resource_BW.csv'
 task_execution_file = 'test/canonicalgraph_task_exe_time.csv'
 dag_file = 'test/canonicalgraph_task_connectivity.csv'
 
-# Initialize the relevant HEFT matrices and DAGs
+# Initialize the relevant HEFT matrices and DAG
 communication_matrix = heft.readCsvToNumpyMatrix(pe_connectivity_file)
 computation_matrix = heft.readCsvToNumpyMatrix(task_execution_file)
 dag = heft.readDagMatrix(dag_file)
 
-existing_schedules - {}
+existing_schedules = None
 time_offset = 0
 
 """
-Everything other than dag has a default value
+All keyword arguments have default values
 
 proc_schedules gives a dictionary with keys being processor number and values being lists of tasks on each processor
 
 task_schedules gives a dictionary with keys being node number (the label in the dag) and the values being the task of a particular job, potentially relabeled
+
+matrix_schedules gives an Nx2 matrix representation (assuming N tasks) where each row represents a task. The first column of each row is the processor that task is scheduled on, and the second column of each row is the relative execution order of that task on that processor (i.e. (P1, 1st), (P1, 2nd), (P2, 1st), ...)
 """
-proc_schedules, task_schedules, Nx2_matrix = 
+proc_schedules, task_schedules, matrix_schedules = 
   heft.schedule_dag(
     dag, 
     communication_matrix=communication_matrix, 
@@ -93,3 +96,6 @@ proc_schedules, task_schedules, Nx2_matrix =
     relabel_nodes=True
   )
 ```
+
+## Testing
+If Pytest is installed, tests can be executed simply by running `pytest` from the repository root directory
