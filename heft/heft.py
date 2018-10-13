@@ -78,7 +78,7 @@ def schedule_dag(dag, computation_matrix=W0, communication_matrix=C0, proc_sched
         #Negates any offsets that would have been needed had the jobs been relabeled
         _self.numExistingJobs = 0
 
-    for i in range(len(_self.computation_matrix)):
+    for i in range(_self.numExistingJobs + len(_self.computation_matrix)):
         _self.task_schedules[i] = None
     for i in range(len(_self.communication_matrix)):
         if i not in _self.proc_schedules:
@@ -116,7 +116,10 @@ def schedule_dag(dag, computation_matrix=W0, communication_matrix=C0, proc_sched
                 assert first_end <= second_start, \
                 f"Jobs on a particular processor must finish before the next can begin, but one job ends at {first_end} and its successor starts at {second_start}"
     
-    matrix_output = np.zeros([numExistingJobs + len(_self.task_schedules), 2])
+    if relabel_nodes:
+        matrix_output = np.zeros([len(_self.task_schedules), 2])
+    else:
+        matrix_output = np.zeros([numExistingJobs + len(_self.task_schedules), 2])
     for proc_num, proc_tasks in _self.proc_schedules.items():
         for idx, task in enumerate(proc_tasks):
             matrix_output[task.task, 0] = proc_num

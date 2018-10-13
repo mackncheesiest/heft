@@ -50,6 +50,10 @@ def test_canonical_graph():
     assert task_sched == expected_task_sched
     assert np.array_equal(matrix_sched, expected_matrix_sched)
 
+def test_canonical_graph_twice():
+    # TODO Implement a regression test for scheduling around an existing set of tasks with time offset
+    assert True == True
+
 def test_random_graph():
     expected_proc_sched = {
         0: [heft.ScheduleEvent(task=1, start=approx(65.9566, 0.001), end=approx(95.881, 0.001), proc=0), 
