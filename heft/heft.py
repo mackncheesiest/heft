@@ -117,9 +117,9 @@ def schedule_dag(dag, computation_matrix=W0, communication_matrix=C0, proc_sched
                 f"Jobs on a particular processor must finish before the next can begin, but one job ends at {first_end} and its successor starts at {second_start}"
     
     if relabel_nodes:
-        matrix_output = np.zeros([len(_self.task_schedules), 2])
+        matrix_output = np.zeros([len(_self.task_schedules), 2], dtype=np.uint8)
     else:
-        matrix_output = np.zeros([numExistingJobs + len(_self.task_schedules), 2])
+        matrix_output = np.zeros([numExistingJobs + len(_self.task_schedules), 2], dtype=np.uint8)
     for proc_num, proc_tasks in _self.proc_schedules.items():
         for idx, task in enumerate(proc_tasks):
             matrix_output[task.task, 0] = proc_num
