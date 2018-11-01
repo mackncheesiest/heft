@@ -51,8 +51,82 @@ def test_canonical_graph():
     assert np.array_equal(matrix_sched, expected_matrix_sched)
 
 def test_canonical_graph_twice():
-    # TODO Implement a regression test for scheduling around an existing set of tasks with time offset
-    assert True == True
+    expected_proc_sched = {
+        0: [heft.ScheduleEvent(task=10, start=10.0, end=24.0, proc=0),
+            heft.ScheduleEvent(task=1, start=27.0, end=40.0, proc=0),
+            heft.ScheduleEvent(task=12, start=40.0, end=51.0, proc=0),
+            heft.ScheduleEvent(task=7, start=57.0, end=62.0, proc=0),
+            heft.ScheduleEvent(task=14, start=62.0, end=74.0, proc=0),
+            heft.ScheduleEvent(task=16, start=74.0, end=81.0, proc=0)],
+        1: [heft.ScheduleEvent(task=3, start=18.0, end=26.0, proc=1), 
+            heft.ScheduleEvent(task=5, start=26.0, end=42.0, proc=1), 
+            heft.ScheduleEvent(task=13, start=42.0, end=50.0, proc=1),
+            heft.ScheduleEvent(task=8, start=56.0, end=68.0, proc=1), 
+            heft.ScheduleEvent(task=9, start=73.0, end=80.0, proc=1),
+            heft.ScheduleEvent(task=18, start=87.0, end=99.0, proc=1),
+            heft.ScheduleEvent(task=19, start=102.0, end=109.0, proc=1)],
+        2: [heft.ScheduleEvent(task=0, start=0, end=9.0, proc=2), 
+            heft.ScheduleEvent(task=2, start=9.0, end=28.0, proc=2), 
+            heft.ScheduleEvent(task=4, start=28.0, end=38.0, proc=2), 
+            heft.ScheduleEvent(task=6, start=38.0, end=49.0, proc=2),
+            heft.ScheduleEvent(task=11, start=49.0, end=67.0, proc=2),
+            heft.ScheduleEvent(task=15, start=67.0, end=76.0, proc=2),
+            heft.ScheduleEvent(task=17, start=77.0, end=91.0, proc=2)]
+    }
+    expected_task_sched = {
+        0: None,
+        1: None,
+        2: None,
+        3: None,
+        4: None,
+        5: None,
+        6: None,
+        7: None,
+        8: None,
+        9: None,
+        10: heft.ScheduleEvent(task=10, start=10.0, end=24.0, proc=0),
+        11: heft.ScheduleEvent(task=11, start=49.0, end=67.0, proc=2),
+        12: heft.ScheduleEvent(task=12, start=40.0, end=51.0, proc=0),
+        13: heft.ScheduleEvent(task=13, start=42.0, end=50.0, proc=1),
+        14: heft.ScheduleEvent(task=14, start=62.0, end=74.0, proc=0),
+        15: heft.ScheduleEvent(task=15, start=67.0, end=76.0, proc=2),
+        16: heft.ScheduleEvent(task=16, start=74.0, end=81.0, proc=0),
+        17: heft.ScheduleEvent(task=17, start=77.0, end=91.0, proc=2),
+        18: heft.ScheduleEvent(task=18, start=87.0, end=99.0, proc=1),
+        19: heft.ScheduleEvent(task=19, start=102.0, end=109.0, proc=1)
+    }
+    expected_matrix_sched = np.array([
+        [2, 0],
+        [0, 1],
+        [2, 1],
+        [1, 0],
+        [2, 2],
+        [1, 1],
+        [2, 3],
+        [0, 3],
+        [1, 3],
+        [1, 4],
+        [0, 0],
+        [2, 4],
+        [0, 2],
+        [1, 2],
+        [0, 4],
+        [2, 5],
+        [0, 5],
+        [2, 6],
+        [1, 5],
+        [1, 6]
+    ])
+
+    dag = heft.readDagMatrix('test/canonicalgraph_task_connectivity.csv')
+    comm = heft.readCsvToNumpyMatrix('test/canonicalgraph_resource_BW.csv')
+    comp = heft.readCsvToNumpyMatrix('test/canonicalgraph_task_exe_time.csv')
+    proc_sched, task_sched, matrix_sched = heft.schedule_dag(dag, communication_matrix=comm, computation_matrix=comp, proc_schedules=None, time_offset=0, relabel_nodes=True)
+    proc_sched, task_sched, matrix_sched = heft.schedule_dag(dag, communication_matrix=comm, computation_matrix=comp, proc_schedules=proc_sched, time_offset=10, relabel_nodes=True)
+
+    assert proc_sched == expected_proc_sched
+    assert task_sched == expected_task_sched
+    assert np.array_equal(matrix_sched, expected_matrix_sched)
 
 def test_random_graph():
     expected_proc_sched = {
