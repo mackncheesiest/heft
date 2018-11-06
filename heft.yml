@@ -7,4 +7,6 @@ dependencies:
 - numpy=1.15.1
 - python=3.7.0
 - pytest=3.8.2
+- pip=18.1
+- nb_conda=2.2.1
 

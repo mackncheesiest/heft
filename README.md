@@ -18,8 +18,11 @@ Otherwise, the main dependencies are:
 - Numpy
 - Networkx
 - Pytest (development dependency only)
+- nb_conda (only if using a conda environment & want jupyter notebook to use the right python version)
 
-## Usage
+Finally, if you want it available as a local package for availability elsewhere on your system, it can be installed with `pip install .`
+
+## Command line Usage
 Basic usage is given by `python -m heft.heft -h`
 
 ```
@@ -58,44 +61,9 @@ With a generated Gantt chart available using
 
 `python -m heft.heft --showGantt`
 
-## Usage from an external library
+## Usage as an external library
 
-
-```
-from heft import heft
-
-pe_connectivity_file = 'test/canonicalgraph_resource_BW.csv'
-task_execution_file = 'test/canonicalgraph_task_exe_time.csv'
-dag_file = 'test/canonicalgraph_task_connectivity.csv'
-
-# Initialize the relevant HEFT matrices and DAG
-communication_matrix = heft.readCsvToNumpyMatrix(pe_connectivity_file)
-computation_matrix = heft.readCsvToNumpyMatrix(task_execution_file)
-dag = heft.readDagMatrix(dag_file)
-
-existing_schedules = None
-time_offset = 0
-
-"""
-All keyword arguments have default values
-
-proc_schedules gives a dictionary with keys being processor number and values being lists of tasks on each processor
-
-task_schedules gives a dictionary with keys being node number (the label in the dag) and the values being the task of a particular job, potentially relabeled
-
-matrix_schedules gives an Nx2 matrix representation (assuming N tasks) where each row represents a task. The first column of each row is the processor that task is scheduled on, and the second column of each row is the relative execution order of that task on that processor (i.e. (P1, 1st), (P1, 2nd), (P2, 1st), ...)
-"""
-proc_schedules, task_schedules, matrix_schedules = 
-  heft.schedule_dag(
-    dag, 
-    communication_matrix=communication_matrix, 
-    computation_matrix=computation_matrix, 
-    proc_schedules=existing_schedules, 
-    time_offset=time_offset,
-    #If proc_schedules has schedules for nodes 1-10, then relabel your dag to be 11+
-    relabel_nodes=True
-  )
-```
+Example usage as an external library is given by [this notebook](https://github.com/mackncheesiest/heft/blob/master/jupyter/HEFT_Example.ipynb)
 
 ## Testing
 If Pytest is installed, tests can be executed simply by running `pytest` from the repository root directory
