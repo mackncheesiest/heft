@@ -1,1 +1,1 @@
-__all__ = ["heft", "gantt"]
+__all__ = ["heft", "gantt", "dag_merge"]

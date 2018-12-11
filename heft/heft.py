@@ -68,7 +68,8 @@ def schedule_dag(dag, computation_matrix=W0, communication_matrix=C0, proc_sched
         'task_schedules': {},
         'proc_schedules': proc_schedules,
         'numExistingJobs': numExistingJobs,
-        'time_offset': time_offset
+        'time_offset': time_offset,
+        'root_node': None
     }
     _self = SimpleNamespace(**_self)
 
@@ -85,6 +86,11 @@ def schedule_dag(dag, computation_matrix=W0, communication_matrix=C0, proc_sched
             _self.proc_schedules[i] = []
 
     # Nodes with no successors cause the any expression to be empty    
+    root_node = [node for node in dag.nodes() if not any(True for _ in dag.predecessors(node))]
+    assert len(root_node) == 1, f"Expected a single root node, found {len(root_node)}"
+    root_node = root_node[0]
+    _self.root_node = root_node
+    
     terminal_node = [node for node in dag.nodes() if not any(True for _ in dag.successors(node))]
     assert len(terminal_node) == 1, f"Expected a single terminal node, found {len(terminal_node)}"
     terminal_node = terminal_node[0]
@@ -94,6 +100,10 @@ def schedule_dag(dag, computation_matrix=W0, communication_matrix=C0, proc_sched
 
     logger.debug(""); logger.debug("====================== Computing EFT for each (task, processor) pair and scheduling in order of decreasing Rank-U ======================"); logger.debug("")
     sorted_nodes = sorted(dag.nodes(), key=lambda node: dag.nodes()[node]['ranku'], reverse=True)
+    if sorted_nodes[0] != root_node:
+        logger.debug("Root node was not the first node in the sorted list. Must be a zero-cost and zero-weight placeholder node. Rearranging it so it is scheduled first\n")
+        idx = sorted_nodes.index(root_node)
+        sorted_nodes[idx], sorted_nodes[0] = sorted_nodes[0], sorted_nodes[idx]
     for node in sorted_nodes:
         minTaskSchedule = ScheduleEvent(node, inf, inf, -1)
         for proc in range(len(communication_matrix)):
@@ -152,7 +162,7 @@ def _compute_ranku(_self, dag, terminal_node):
             val = float(dag[node][succnode]['avgweight']) + dag.nodes()[succnode]['ranku']
             if val > max_successor_ranku:
                 max_successor_ranku = val
-        assert max_successor_ranku > 0, f"Expected maximum successor ranku to be greater than 0 but was {max_successor_ranku}"
+        assert max_successor_ranku >= 0, f"Expected maximum successor ranku to be greater or equal to 0 but was {max_successor_ranku}"
         nx.set_node_attributes(dag, { node: np.mean(_self.computation_matrix[node-_self.numExistingJobs]) + max_successor_ranku }, "ranku")
 
         visit_queue.extendleft([prednode for prednode in dag.predecessors(node) if prednode not in visit_queue])
@@ -188,7 +198,7 @@ def _compute_eft(_self, dag, node, proc):
     logger.debug(f"Computing EFT for node {node} on processor {proc}")
     for prednode in list(dag.predecessors(node)):
         predjob = _self.task_schedules[prednode]
-        assert predjob != None, f"Predecessor nodes must be scheduled before their children, but node {node} has an unscheduled predecessor of {predjob}"
+        assert predjob != None, f"Predecessor nodes must be scheduled before their children, but node {node} has an unscheduled predecessor of {prednode}"
         logger.debug(f"\tLooking at predecessor node {prednode} with job {predjob} to determine ready time")
         if _self.communication_matrix[predjob.proc, proc] == 0:
             ready_time_t = predjob.end
@@ -198,7 +208,8 @@ def _compute_eft(_self, dag, node, proc):
         if ready_time_t > ready_time:
             ready_time = ready_time_t
     if ready_time == _self.time_offset:
-        assert len(list(dag.predecessors(node))) is 0, f"Only nodes without predecessors should have a ready time of 0, but node {node} has predecessors {list(dag.predecessors(node))}"
+        assert len(list(dag.predecessors(node))) is 0 or (len(list(dag.predecessors(node))) is 1 and list(dag.predecessors(node))[0] == _self.root_node), \
+            f"Only nodes without predecessors should have a ready time of 0, but node {node} has predecessors {list(dag.predecessors(node))}"
     logger.debug(f"\tReady time determined to be {ready_time}")
 
     computation_time = _self.computation_matrix[node-_self.numExistingJobs, proc]
