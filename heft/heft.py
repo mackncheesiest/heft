@@ -97,7 +97,7 @@ def schedule_dag(dag, computation_matrix=W0, communication_matrix=C0, proc_sched
     terminal_node = terminal_node[0]
 
     logger.debug(""); logger.debug("====================== Performing Rank-U Computation ======================\n"); logger.debug("")
-    _compute_ranku(_self, dag, root_node, terminal_node, metric=rank_metric)
+    _compute_ranku(_self, dag, terminal_node, metric=rank_metric)
 
     logger.debug(""); logger.debug("====================== Computing EFT for each (task, processor) pair and scheduling in order of decreasing Rank-U ======================"); logger.debug("")
     sorted_nodes = sorted(dag.nodes(), key=lambda node: dag.nodes()[node]['ranku'], reverse=True)
@@ -138,7 +138,7 @@ def schedule_dag(dag, computation_matrix=W0, communication_matrix=C0, proc_sched
 
     return _self.proc_schedules, _self.task_schedules, matrix_output
     
-def _compute_ranku(_self, dag, root_node, terminal_node, metric=RankMetric.MEAN):
+def _compute_ranku(_self, dag, terminal_node, metric=RankMetric.MEAN):
     """
     Uses a basic BFS approach to traverse upwards through the graph assigning ranku along the way
     """
@@ -198,7 +198,7 @@ def _compute_ranku(_self, dag, root_node, terminal_node, metric=RankMetric.MEAN)
             assert min_successor_ranku >= 0, f"Expected minimum successor ranku to be greater or equal to 0 but was {min_successor_ranku}"
             nx.set_node_attributes(dag, { node: _self.computation_matrix[node-_self.numExistingJobs, min_node_idx] + min_successor_ranku}, "ranku")
         else:
-            logger.warn(f"Unrecognied Rank-U metric {metric}, unable to compute upward rank")
+            logger.error(f"Unrecognied Rank-U metric {metric}, unable to compute upward rank")
 
         visit_queue.extendleft([prednode for prednode in dag.predecessors(node) if prednode not in visit_queue])
     
