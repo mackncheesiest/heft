@@ -50,11 +50,6 @@ def schedule_dag(dag, computation_matrix=W0, communication_matrix=C0, proc_sched
     Given an application DAG and a set of matrices specifying PE bandwidth and (task, pe) execution times, computes the HEFT schedule
     of that DAG onto that set of PEs 
     """
-    avgCommunicationCost = np.mean(communication_matrix[np.where(communication_matrix > 0)])
-    for edge in dag.edges():
-        logger.debug(f"Assigning {edge}'s average weight based on average communication cost. {float(dag.get_edge_data(*edge)['weight'])} => {float(dag.get_edge_data(*edge)['weight']) / avgCommunicationCost}")
-        nx.set_edge_attributes(dag, { edge: float(dag.get_edge_data(*edge)['weight']) / avgCommunicationCost }, 'avgweight')
-    
     if proc_schedules == None:
         proc_schedules = {}
 
@@ -141,7 +136,12 @@ def _compute_ranku(_self, dag, terminal_node):
     """
     Uses a basic BFS approach to traverse upwards through the graph assigning ranku along the way
     """
-    nx.set_node_attributes(dag, { terminal_node: np.mean(_self.computation_matrix[terminal_node-1-_self.numExistingJobs]) }, "ranku")
+    avgCommunicationCost = np.mean(_self.communication_matrix[np.where(_self.communication_matrix > 0)])
+    for edge in dag.edges():
+        logger.debug(f"Assigning {edge}'s average weight based on average communication cost. {float(dag.get_edge_data(*edge)['weight'])} => {float(dag.get_edge_data(*edge)['weight']) / avgCommunicationCost}")
+        nx.set_edge_attributes(dag, { edge: float(dag.get_edge_data(*edge)['weight']) / avgCommunicationCost }, 'avgweight')
+
+    nx.set_node_attributes(dag, { terminal_node: np.mean(_self.computation_matrix[terminal_node-_self.numExistingJobs]) }, "ranku")
     visit_queue = deque(dag.predecessors(terminal_node))
 
     while visit_queue:

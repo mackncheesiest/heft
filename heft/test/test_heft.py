@@ -1,5 +1,6 @@
 from heft import heft
 from pytest import approx
+from types import SimpleNamespace
 import numpy as np
 
 
@@ -174,3 +175,44 @@ def test_random_graph():
     assert proc_sched == expected_proc_sched
     assert task_sched == expected_task_sched
     assert np.array_equal(matrix_sched, expected_matrix_sched)
+
+def test_mean_ranku():
+    expected_ranku = [
+        108,
+        77,
+        80,
+        80,
+        69,
+        63.333,
+        42.667,
+        35.667,
+        44.333,
+        14.667
+    ]
+
+    dag = heft.readDagMatrix('test/canonicalgraph_task_connectivity.csv')
+    comm = heft.readCsvToNumpyMatrix('test/canonicalgraph_resource_BW.csv')
+    comp = heft.readCsvToNumpyMatrix('test/canonicalgraph_task_exe_time.csv')
+
+    _self = {
+        'computation_matrix': comp,
+        'communication_matrix': comm,
+        'task_schedules': {},
+        'proc_schedules': {},
+        'numExistingJobs': 0,
+        'time_offset': 0,
+        'root_node': None
+    }
+    _self = SimpleNamespace(**_self)
+
+    terminal_node = [node for node in dag.nodes() if not any(True for _ in dag.successors(node))]
+    assert len(terminal_node) == 1, f"Expected a single terminal node, found {len(terminal_node)}"
+    terminal_node = terminal_node[0]
+
+    heft._compute_ranku(_self, dag, terminal_node)
+
+    for node in dag.nodes():
+        print(dag.nodes()[node]['ranku'])
+
+    for rankidx in range(len(expected_ranku)):
+        assert dag.nodes()[rankidx]['ranku'] == approx(expected_ranku[rankidx], 0.001)
