@@ -205,11 +205,7 @@ def test_mean_ranku():
     }
     _self = SimpleNamespace(**_self)
 
-    terminal_node = [node for node in dag.nodes() if not any(True for _ in dag.successors(node))]
-    assert len(terminal_node) == 1, f"Expected a single terminal node, found {len(terminal_node)}"
-    terminal_node = terminal_node[0]
-
-    heft._compute_ranku(_self, dag, terminal_node)
+    heft._compute_ranku(_self, dag)
 
     for node in dag.nodes():
         print(dag.nodes()[node]['ranku'])
