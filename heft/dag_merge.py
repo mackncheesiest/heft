@@ -14,21 +14,24 @@ class MergeMethod(Enum):
 
 def _common_entry_exit_merge(*args, **kwargs):
     # Forces distinct integer node labels (no need to deal with relabeling nodes with a common name across both graphs)
-    combined_dag = nx.algorithms.operators.all.disjoint_union_all(args)
+    if "skip_relabeling" in kwargs and kwargs["skip_relabeling"] is True:
+        combined_dag = _merge_without_relabeling(args)
+    else:
+        combined_dag = nx.algorithms.operators.all.disjoint_union_all(args)
 
     root_nodes = [node for node in combined_dag.nodes() if not any(True for _ in combined_dag.predecessors(node))]
     terminal_nodes = [node for node in combined_dag.nodes() if not any(True for _ in combined_dag.successors(node))]
 
-    num_nodes = combined_dag.number_of_nodes()
-    combined_dag.add_node(num_nodes)
-    combined_dag.add_node(num_nodes+1)
+    max_node = max(combined_dag)
+    combined_dag.add_node(max_node+1)
+    combined_dag.add_node(max_node+2)
 
     for node in root_nodes:
-        combined_dag.add_edge(num_nodes, node)
-        combined_dag[num_nodes][node]['weight'] = 0
+        combined_dag.add_edge(max_node+1, node)
+        combined_dag[max_node+1][node]['weight'] = 0
     for node in terminal_nodes:
-        combined_dag.add_edge(node, num_nodes+1)
-        combined_dag[node][num_nodes+1]['weight'] = 0
+        combined_dag.add_edge(node, max_node+2)
+        combined_dag[node][max_node+2]['weight'] = 0
     return combined_dag
 
 def _level_based_merge(*args, **kwargs):
@@ -60,7 +63,10 @@ def _ranking_based_merge(*args, **kwargs):
         heft._compute_ranku(_self, dag)
         dag_max_ranks.append(dag.nodes()[root_nodes[-1]]['ranku'])
 
-    combined_dag = nx.algorithms.operators.all.disjoint_union_all(args)
+    if "skip_relabeling" in kwargs and kwargs["skip_relabeling"] is True:
+        combined_dag = _merge_without_relabeling(args)
+    else:
+        combined_dag = nx.algorithms.operators.all.disjoint_union_all(args)
     # sorted_indices = sorted(range(len(dag_max_ranks)), key=lambda k: dag_max_ranks[k], reverse=True)
     sorted_indices = sorted(range(len(dag_max_ranks)), key=lambda k: dag_max_ranks[k], reverse=False)
     for sort_idx, dag_idx in enumerate(sorted_indices):
@@ -79,12 +85,24 @@ def _ranking_based_merge(*args, **kwargs):
         combined_dag[terminal_node][target_node]['weight'] = 0
 
     root_nodes = [node for node in combined_dag.nodes() if not any(True for _ in combined_dag.predecessors(node))]
-    num_nodes = combined_dag.number_of_nodes()
-    combined_dag.add_node(num_nodes)
+    max_node = max(combined_dag)
+    combined_dag.add_node(max_node+1)
     for node in root_nodes:
-        combined_dag.add_edge(num_nodes, node)
-        combined_dag[num_nodes][node]['weight'] = 0
+        combined_dag.add_edge(max_node+1, node)
+        combined_dag[max_node+1][node]['weight'] = 0
 
+    return combined_dag
+
+def _merge_without_relabeling(dag_list):
+    combined_dag = nx.DiGraph()
+    for dag in dag_list:
+        if len(combined_dag) == 0:
+            combined_dag = dag.copy()
+            continue
+        combined_dag = nx.union(combined_dag, dag.copy())
+        # offset = max(combined_dag) + 1
+        # new_dag = nx.relabel_nodes(dag, lambda idx: idx + offset, copy=True)
+        # combined_dag = nx.union(combined_dag, new_dag)
     return combined_dag
 
 def _get_index_with_offset(dag_list, dag_num, node_label):
@@ -95,7 +113,6 @@ def _get_index_with_offset(dag_list, dag_num, node_label):
 
 merge_methods = {
     MergeMethod.COMMON_ENTRY_EXIT: _common_entry_exit_merge,
-    MergeMethod.LEVEL_BASED: _level_based_merge,
     MergeMethod.RANKING_BASED: _ranking_based_merge
 }
 def merge_dags(*args, merge_method=MergeMethod.COMMON_ENTRY_EXIT, **kwargs):
