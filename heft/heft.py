@@ -147,7 +147,10 @@ def _compute_ranku(_self, dag, metric=RankMetric.MEAN):
         logger.debug(f"Assigning {edge}'s average weight based on average communication cost. {float(dag.get_edge_data(*edge)['weight'])} => {float(dag.get_edge_data(*edge)['weight']) / avgCommunicationCost}")
         nx.set_edge_attributes(dag, { edge: float(dag.get_edge_data(*edge)['weight']) / avgCommunicationCost }, 'avgweight')
 
-    nx.set_node_attributes(dag, { terminal_node: np.mean(_self.computation_matrix[terminal_node-_self.numExistingJobs]) }, "ranku")
+    # Utilize a masked array so that np.mean, etc, calculations ignore the entries that are inf
+    comp_matrix_masked = np.ma.masked_where(_self.computation_matrix == inf, _self.computation_matrix)
+
+    nx.set_node_attributes(dag, { terminal_node: np.mean(comp_matrix_masked[terminal_node-_self.numExistingJobs]) }, "ranku")
     visit_queue = deque(dag.predecessors(terminal_node))
 
     while visit_queue:
@@ -170,33 +173,33 @@ def _compute_ranku(_self, dag, metric=RankMetric.MEAN):
                 if val > max_successor_ranku:
                     max_successor_ranku = val
             assert max_successor_ranku >= 0, f"Expected maximum successor ranku to be greater or equal to 0 but was {max_successor_ranku}"
-            nx.set_node_attributes(dag, { node: np.mean(_self.computation_matrix[node-_self.numExistingJobs]) + max_successor_ranku }, "ranku")
+            nx.set_node_attributes(dag, { node: np.mean(comp_matrix_masked[node-_self.numExistingJobs]) + max_successor_ranku }, "ranku")
         elif metric == RankMetric.WORST:
             max_successor_ranku = -1
-            max_node_idx = np.where(_self.computation_matrix[node-_self.numExistingJobs] == max(_self.computation_matrix[node-_self.numExistingJobs]))[0][0]
-            logger.debug(f"\tNode {node} has maximum computation cost of {_self.computation_matrix[node-_self.numExistingJobs][max_node_idx]} on processor {max_node_idx}")
+            max_node_idx = np.where(comp_matrix_masked[node-_self.numExistingJobs] == max(comp_matrix_masked[node-_self.numExistingJobs]))[0][0]
+            logger.debug(f"\tNode {node} has maximum computation cost of {comp_matrix_masked[node-_self.numExistingJobs][max_node_idx]} on processor {max_node_idx}")
             for succnode in dag.successors(node):
                 logger.debug(f"\tLooking at successor node: {succnode}")
-                max_succ_idx = np.where(_self.computation_matrix[succnode-_self.numExistingJobs] == max(_self.computation_matrix[succnode-_self.numExistingJobs]))[0][0]
-                logger.debug(f"\tNode {succnode} has maximum computation cost of {_self.computation_matrix[succnode-_self.numExistingJobs][max_succ_idx]} on processor {max_succ_idx}")
+                max_succ_idx = np.where(comp_matrix_masked[succnode-_self.numExistingJobs] == max(comp_matrix_masked[succnode-_self.numExistingJobs]))[0][0]
+                logger.debug(f"\tNode {succnode} has maximum computation cost of {comp_matrix_masked[succnode-_self.numExistingJobs][max_succ_idx]} on processor {max_succ_idx}")
                 val = _self.communication_matrix[max_node_idx, max_succ_idx] + dag.nodes()[succnode]['ranku']
                 if val > max_successor_ranku:
                     max_successor_ranku = val
             assert max_successor_ranku >= 0, f"Expected maximum successor ranku to be greater or equal to 0 but was {max_successor_ranku}"
-            nx.set_node_attributes(dag, { node: _self.computation_matrix[node-_self.numExistingJobs, max_node_idx] + max_successor_ranku}, "ranku")
+            nx.set_node_attributes(dag, { node: comp_matrix_masked[node-_self.numExistingJobs, max_node_idx] + max_successor_ranku}, "ranku")
         elif metric == RankMetric.BEST:
             min_successor_ranku = inf
-            min_node_idx = np.where(_self.computation_matrix[node-_self.numExistingJobs] == min(_self.computation_matrix[node-_self.numExistingJobs]))
+            min_node_idx = np.where(comp_matrix_masked[node-_self.numExistingJobs] == min(comp_matrix_masked[node-_self.numExistingJobs]))
             logger.debug(f"\tNode {node} has minimum computation cost on processor {min_node_idx}")
             for succnode in dag.successors(node):
                 logger.debug(f"\tLooking at successor node: {succnode}")
-                min_succ_idx = np.where(_self.computation_matrix[succnode-_self.numExistingJobs] == min(_self.computation_matrix[succnode-_self.numExistingJobs]))
+                min_succ_idx = np.where(comp_matrix_masked[succnode-_self.numExistingJobs] == min(comp_matrix_masked[succnode-_self.numExistingJobs]))
                 logger.debug(f"\tThis successor node has minimum computation cost on processor {min_succ_idx}")
                 val = _self.communication_matrix[min_node_idx, min_succ_idx] + dag.nodes()[succnode]['ranku']
                 if val < min_successor_ranku:
                     min_successor_ranku = val
             assert min_successor_ranku >= 0, f"Expected minimum successor ranku to be greater or equal to 0 but was {min_successor_ranku}"
-            nx.set_node_attributes(dag, { node: _self.computation_matrix[node-_self.numExistingJobs, min_node_idx] + min_successor_ranku}, "ranku")
+            nx.set_node_attributes(dag, { node: comp_matrix_masked[node-_self.numExistingJobs, min_node_idx] + min_successor_ranku}, "ranku")
         else:
             raise RuntimeError(f"Unrecognied Rank-U metric {metric}, unable to compute upward rank")
 

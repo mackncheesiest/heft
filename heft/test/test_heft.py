@@ -212,3 +212,57 @@ def test_mean_ranku():
 
     for rankidx in range(len(expected_ranku)):
         assert dag.nodes()[rankidx]['ranku'] == approx(expected_ranku[rankidx], 0.001)
+
+def test_graph_with_PE_restrictions():
+    expected_proc_sched = {
+        0: [heft.ScheduleEvent(task=1, start=27.0, end=40.0, proc=0), 
+            heft.ScheduleEvent(task=7, start=57.0, end=62.0, proc=0)],
+        1: [heft.ScheduleEvent(task=3, start=18.0, end=26.0, proc=1), 
+            heft.ScheduleEvent(task=5, start=26.0, end=42.0, proc=1), 
+            heft.ScheduleEvent(task=8, start=56.0, end=68.0, proc=1), 
+            heft.ScheduleEvent(task=9, start=73.0, end=80.0, proc=1)],
+        2: [heft.ScheduleEvent(task=0, start=0, end=9.0, proc=2), 
+            heft.ScheduleEvent(task=2, start=9.0, end=28.0, proc=2), 
+            heft.ScheduleEvent(task=4, start=28.0, end=38.0, proc=2), 
+            heft.ScheduleEvent(task=6, start=38.0, end=49.0, proc=2)],
+        3: []
+    }
+    expected_task_sched = {
+        0: heft.ScheduleEvent(task=0, start=0, end=9.0, proc=2),
+        1: heft.ScheduleEvent(task=1, start=27.0, end=40.0, proc=0),
+        2: heft.ScheduleEvent(task=2, start=9.0, end=28.0, proc=2),
+        3: heft.ScheduleEvent(task=3, start=18.0, end=26.0, proc=1),
+        4: heft.ScheduleEvent(task=4, start=28.0, end=38.0, proc=2),
+        5: heft.ScheduleEvent(task=5, start=26.0, end=42.0, proc=1),
+        6: heft.ScheduleEvent(task=6, start=38.0, end=49.0, proc=2),
+        7: heft.ScheduleEvent(task=7, start=57.0, end=62.0, proc=0),
+        8: heft.ScheduleEvent(task=8, start=56.0, end=68.0, proc=1),
+        9: heft.ScheduleEvent(task=9, start=73.0, end=80.0, proc=1)
+    }
+    expected_matrix_sched = np.array([
+        [2, 0],
+        [0, 0],
+        [2, 1],
+        [1, 0],
+        [2, 2],
+        [1, 1],
+        [2, 3],
+        [0, 1],
+        [1, 2],
+        [1, 3]
+    ])
+
+    dag = heft.readDagMatrix('test/canonicalgraph_task_connectivity.csv')
+    comm = heft.readCsvToNumpyMatrix('test/canonicalgraph_resource_BW.csv')
+    comp = heft.readCsvToNumpyMatrix('test/canonicalgraph_task_exe_time.csv')
+
+    inf_comp = np.concatenate((comp, np.inf * np.ones((10, 1))), axis=1)
+
+    inf_comm = np.concatenate((comm, [[1], [1], [1]]), axis=1)
+    inf_comm = np.concatenate((inf_comm, [[1, 1, 1, 0]]), axis=0)
+
+    proc_sched, task_sched, matrix_sched = heft.schedule_dag(dag, communication_matrix=inf_comm, computation_matrix=inf_comp, proc_schedules=None, time_offset=0, relabel_nodes=True)
+
+    assert proc_sched == expected_proc_sched
+    assert task_sched == expected_task_sched
+    assert np.array_equal(matrix_sched, expected_matrix_sched)
