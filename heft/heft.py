@@ -142,7 +142,11 @@ def _compute_ranku(_self, dag, metric=RankMetric.MEAN):
     assert len(terminal_node) == 1, f"Expected a single terminal node, found {len(terminal_node)}"
     terminal_node = terminal_node[0]
 
-    avgCommunicationCost = np.mean(_self.communication_matrix[np.where(_self.communication_matrix > 0)])
+    #TODO: Should this be configurable?
+    #avgCommunicationCost = np.mean(_self.communication_matrix[np.where(_self.communication_matrix > 0)])
+    diagonal_mask = np.ones(_self.communication_matrix.shape, dtype=bool)
+    np.fill_diagonal(diagonal_mask, 0)
+    avgCommunicationCost = np.mean(_self.communication_matrix[diagonal_mask])
     for edge in dag.edges():
         logger.debug(f"Assigning {edge}'s average weight based on average communication cost. {float(dag.get_edge_data(*edge)['weight'])} => {float(dag.get_edge_data(*edge)['weight']) / avgCommunicationCost}")
         nx.set_edge_attributes(dag, { edge: float(dag.get_edge_data(*edge)['weight']) / avgCommunicationCost }, 'avgweight')
