@@ -127,12 +127,17 @@ def schedule_dag(dag, computation_matrix=W0, communication_matrix=C0, proc_sched
         matrix_output = np.zeros([len(_self.task_schedules), 2], dtype=np.uint8)
     else:
         matrix_output = np.zeros([numExistingJobs + len(_self.task_schedules), 2], dtype=np.uint8)
+    dict_output = {}
     for proc_num, proc_tasks in _self.proc_schedules.items():
         for idx, task in enumerate(proc_tasks):
             matrix_output[task.task, 0] = proc_num
             matrix_output[task.task, 1] = idx
+            if idx > 0:
+                dict_output[task.task] = (proc_num, idx, [proc_tasks[idx-1]])
+            else:
+                dict_output[task.task] = (proc_num, idx, [])
 
-    return _self.proc_schedules, _self.task_schedules, matrix_output
+    return _self.proc_schedules, _self.task_schedules, matrix_output, dict_output
     
 def _compute_ranku(_self, dag, metric=RankMetric.MEAN):
     """
