@@ -45,7 +45,7 @@ def test_canonical_graph():
     dag = heft.readDagMatrix('test/canonicalgraph_task_connectivity.csv')
     comm = heft.readCsvToNumpyMatrix('test/canonicalgraph_resource_BW.csv')
     comp = heft.readCsvToNumpyMatrix('test/canonicalgraph_task_exe_time.csv')
-    proc_sched, task_sched, matrix_sched = heft.schedule_dag(dag, communication_matrix=comm, computation_matrix=comp, proc_schedules=None, time_offset=0, relabel_nodes=True)
+    proc_sched, task_sched, matrix_sched, _ = heft.schedule_dag(dag, communication_matrix=comm, computation_matrix=comp, proc_schedules=None, time_offset=0, relabel_nodes=True)
 
     assert proc_sched == expected_proc_sched
     assert task_sched == expected_task_sched
@@ -122,8 +122,8 @@ def test_canonical_graph_twice():
     dag = heft.readDagMatrix('test/canonicalgraph_task_connectivity.csv')
     comm = heft.readCsvToNumpyMatrix('test/canonicalgraph_resource_BW.csv')
     comp = heft.readCsvToNumpyMatrix('test/canonicalgraph_task_exe_time.csv')
-    proc_sched, task_sched, matrix_sched = heft.schedule_dag(dag, communication_matrix=comm, computation_matrix=comp, proc_schedules=None, time_offset=0, relabel_nodes=True)
-    proc_sched, task_sched, matrix_sched = heft.schedule_dag(dag, communication_matrix=comm, computation_matrix=comp, proc_schedules=proc_sched, time_offset=10, relabel_nodes=True)
+    proc_sched, task_sched, matrix_sched, _ = heft.schedule_dag(dag, communication_matrix=comm, computation_matrix=comp, proc_schedules=None, time_offset=0, relabel_nodes=True)
+    proc_sched, task_sched, matrix_sched, _ = heft.schedule_dag(dag, communication_matrix=comm, computation_matrix=comp, proc_schedules=proc_sched, time_offset=10, relabel_nodes=True)
 
     assert proc_sched == expected_proc_sched
     assert task_sched == expected_task_sched
@@ -170,7 +170,7 @@ def test_random_graph():
     dag = heft.readDagMatrix('test/randomgraph_task_connectivity.csv')
     comm = heft.readCsvToNumpyMatrix('test/randomgraph_resource_BW.csv')
     comp = heft.readCsvToNumpyMatrix('test/randomgraph_task_exe_time.csv')
-    proc_sched, task_sched, matrix_sched = heft.schedule_dag(dag, communication_matrix=comm, computation_matrix=comp, proc_schedules=None, time_offset=0, relabel_nodes=True)
+    proc_sched, task_sched, matrix_sched, _ = heft.schedule_dag(dag, communication_matrix=comm, computation_matrix=comp, proc_schedules=None, time_offset=0, relabel_nodes=True)
 
     assert proc_sched == expected_proc_sched
     assert task_sched == expected_task_sched
@@ -261,7 +261,7 @@ def test_graph_with_PE_restrictions():
     inf_comm = np.concatenate((comm, [[1], [1], [1]]), axis=1)
     inf_comm = np.concatenate((inf_comm, [[1, 1, 1, 0]]), axis=0)
 
-    proc_sched, task_sched, matrix_sched = heft.schedule_dag(dag, communication_matrix=inf_comm, computation_matrix=inf_comp, proc_schedules=None, time_offset=0, relabel_nodes=True)
+    proc_sched, task_sched, matrix_sched, _ = heft.schedule_dag(dag, communication_matrix=inf_comm, computation_matrix=inf_comp, proc_schedules=None, time_offset=0, relabel_nodes=True)
 
     assert proc_sched == expected_proc_sched
     assert task_sched == expected_task_sched
