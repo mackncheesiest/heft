@@ -1,4 +1,4 @@
-from heft import heft
+from heft import heft, dag_merge
 from pytest import approx
 from types import SimpleNamespace
 import numpy as np
@@ -75,16 +75,16 @@ def test_canonical_graph_twice():
             heft.ScheduleEvent(task=17, start=77.0, end=91.0, proc=2)]
     }
     expected_task_sched = {
-        0: None,
-        1: None,
-        2: None,
-        3: None,
-        4: None,
-        5: None,
-        6: None,
-        7: None,
-        8: None,
-        9: None,
+        0: heft.ScheduleEvent(task=0, start=0, end=9.0, proc=2),
+        1: heft.ScheduleEvent(task=1, start=27.0, end=40.0,proc=0),
+        2: heft.ScheduleEvent(task=2, start=9.0, end=28.0, proc=2),
+        3: heft.ScheduleEvent(task=3, start=18.0, end=26.0, proc=1),
+        4: heft.ScheduleEvent(task=4, start=28.0, end=38.0, proc=2),
+        5: heft.ScheduleEvent(task=5, start=26.0, end=42.0, proc=1),
+        6: heft.ScheduleEvent(task=6, start=38.0, end=49.0, proc=2),
+        7: heft.ScheduleEvent(task=7, start=57.0, end=62.0, proc=0),
+        8: heft.ScheduleEvent(task=8, start=56.0, end=68.0, proc=1),
+        9: heft.ScheduleEvent(task=9, start=73.0, end=80.0, proc=1),
         10: heft.ScheduleEvent(task=10, start=10.0, end=24.0, proc=0),
         11: heft.ScheduleEvent(task=11, start=49.0, end=67.0, proc=2),
         12: heft.ScheduleEvent(task=12, start=40.0, end=51.0, proc=0),

@@ -59,20 +59,19 @@ def schedule_dag(dag, computation_matrix=W0, communication_matrix=C0, proc_sched
     if proc_schedules == None:
         proc_schedules = {}
 
-    numExistingJobs = 0
-    for proc in proc_schedules:
-        numExistingJobs = numExistingJobs + len(proc_schedules[proc])
-    
     _self = {
         'computation_matrix': computation_matrix,
         'communication_matrix': communication_matrix,
         'task_schedules': {},
         'proc_schedules': proc_schedules,
-        'numExistingJobs': numExistingJobs,
+        'numExistingJobs': 0,
         'time_offset': time_offset,
         'root_node': None
     }
     _self = SimpleNamespace(**_self)
+
+    for proc in proc_schedules:
+        _self.numExistingJobs = _self.numExistingJobs + len(proc_schedules[proc])
 
     if relabel_nodes:
         dag = nx.relabel_nodes(dag, dict(map(lambda node: (node, node+_self.numExistingJobs), list(dag.nodes()))))
@@ -85,6 +84,10 @@ def schedule_dag(dag, computation_matrix=W0, communication_matrix=C0, proc_sched
     for i in range(len(_self.communication_matrix)):
         if i not in _self.proc_schedules:
             _self.proc_schedules[i] = []
+
+    for proc in proc_schedules:
+        for schedule_event in proc_schedules[proc]:
+            _self.task_schedules[schedule_event.task] = schedule_event
 
     # Nodes with no successors cause the any expression to be empty    
     root_node = [node for node in dag.nodes() if not any(True for _ in dag.predecessors(node))]
@@ -102,6 +105,8 @@ def schedule_dag(dag, computation_matrix=W0, communication_matrix=C0, proc_sched
         idx = sorted_nodes.index(root_node)
         sorted_nodes[idx], sorted_nodes[0] = sorted_nodes[0], sorted_nodes[idx]
     for node in sorted_nodes:
+        if _self.task_schedules[node] is not None:
+            continue
         minTaskSchedule = ScheduleEvent(node, inf, inf, -1)
         for proc in range(len(communication_matrix)):
             taskschedule = _compute_eft(_self, dag, node, proc)
@@ -118,15 +123,15 @@ def schedule_dag(dag, computation_matrix=W0, communication_matrix=C0, proc_sched
             logger.debug('\n')
         for proc in range(len(_self.proc_schedules)):
             for job in range(len(_self.proc_schedules[proc])-1):
-                first_end = _self.proc_schedules[proc][job].end
-                second_start = _self.proc_schedules[proc][job+1].start
-                assert first_end <= second_start, \
-                f"Jobs on a particular processor must finish before the next can begin, but one job ends at {first_end} and its successor starts at {second_start}"
+                first_job = _self.proc_schedules[proc][job]
+                second_job = _self.proc_schedules[proc][job+1]
+                assert first_job.end <= second_job.start, \
+                f"Jobs on a particular processor must finish before the next can begin, but job {first_job.task} ends at {first_job.end} and its successor {second_job.task} starts at {second_job.start}"
     
     if relabel_nodes:
         matrix_output = np.zeros([len(_self.task_schedules), 2], dtype=np.uint8)
     else:
-        matrix_output = np.zeros([numExistingJobs + len(_self.task_schedules), 2], dtype=np.uint8)
+        matrix_output = np.zeros([_self.numExistingJobs + len(_self.task_schedules), 2], dtype=np.uint8)
     dict_output = {}
     for proc_num, proc_tasks in _self.proc_schedules.items():
         for idx, task in enumerate(proc_tasks):
@@ -264,7 +269,7 @@ def _compute_eft(_self, dag, node, proc):
     for idx in range(len(job_list)):
         prev_job = job_list[idx]
         if idx == 0:
-            if (prev_job.start - computation_time) - ready_time >= 0:
+            if (prev_job.start - computation_time) - ready_time > 0:
                 logger.debug(f"Found an insertion slot before the first job {prev_job} on processor {proc}")
                 job_start = ready_time
                 min_schedule = ScheduleEvent(node, job_start, job_start+computation_time, proc)
@@ -307,6 +312,19 @@ def readCsvToNumpyMatrix(csv_file):
         matrix = matrix.astype(float)
         logger.debug(f"After deleting the first row and column of input data, we are left with this matrix:\n{matrix}")
         return matrix
+
+def readCsvToDict(csv_file):
+    """
+    Given an input file consisting of a comma separated list of numeric values with a single header row and header column, 
+    this function reads that data into a dictionary with keys that are node numbers and values that are the CSV lists
+    """
+    with open(csv_file) as fd:
+        matrix = readCsvToNumpyMatrix(csv_file)
+        
+        outputDict = {}
+        for row_num, row in enumerate(matrix):
+            outputDict[row_num] = row
+        return outputDict
 
 def readDagMatrix(dag_file, show_dag=False):
     """
@@ -365,7 +383,7 @@ if __name__ == "__main__":
     computation_matrix = readCsvToNumpyMatrix(args.task_execution_file)
     dag = readDagMatrix(args.dag_file, args.showDAG) 
 
-    processor_schedules, _, _ = schedule_dag(dag, communication_matrix=communication_matrix, computation_matrix=computation_matrix, rank_metric=args.rank_metric)
+    processor_schedules, _, _, _ = schedule_dag(dag, communication_matrix=communication_matrix, computation_matrix=computation_matrix, rank_metric=args.rank_metric)
     for proc, jobs in processor_schedules.items():
         logger.info(f"Processor {proc} has the following jobs:")
         logger.info(f"\t{jobs}")
