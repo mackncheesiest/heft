@@ -114,7 +114,7 @@ def schedule_dag(dag, computation_matrix=W0, communication_matrix=C0, proc_sched
                 minTaskSchedule = taskschedule
         _self.task_schedules[node] = minTaskSchedule
         _self.proc_schedules[minTaskSchedule.proc].append(minTaskSchedule)
-        _self.proc_schedules[minTaskSchedule.proc] = sorted(_self.proc_schedules[minTaskSchedule.proc], key=lambda schedule_event: schedule_event.start)
+        _self.proc_schedules[minTaskSchedule.proc] = sorted(_self.proc_schedules[minTaskSchedule.proc], key=lambda schedule_event: schedule_event.end)
         if logger.isEnabledFor(logging.DEBUG):
             logger.debug('\n')
             for proc, jobs in _self.proc_schedules.items():
@@ -126,7 +126,7 @@ def schedule_dag(dag, computation_matrix=W0, communication_matrix=C0, proc_sched
                 first_job = _self.proc_schedules[proc][job]
                 second_job = _self.proc_schedules[proc][job+1]
                 assert first_job.end <= second_job.start, \
-                f"Jobs on a particular processor must finish before the next can begin, but job {first_job.task} ends at {first_job.end} and its successor {second_job.task} starts at {second_job.start}"
+                f"Jobs on a particular processor must finish before the next can begin, but job {first_job.task} on processor {first_job.proc} ends at {first_job.end} and its successor {second_job.task} starts at {second_job.start}"
     
     if relabel_nodes:
         matrix_output = np.zeros([len(_self.task_schedules), 2], dtype=np.uint8)
@@ -137,7 +137,7 @@ def schedule_dag(dag, computation_matrix=W0, communication_matrix=C0, proc_sched
         for idx, task in enumerate(proc_tasks):
             matrix_output[task.task, 0] = proc_num
             matrix_output[task.task, 1] = idx
-            if idx > 0:
+            if idx > 0 and (proc_tasks[idx-1].end - proc_tasks[idx-1].start > 0):
                 dict_output[task.task] = (proc_num, idx, [proc_tasks[idx-1]])
             else:
                 dict_output[task.task] = (proc_num, idx, [])
@@ -259,9 +259,6 @@ def _compute_eft(_self, dag, node, proc):
         logger.debug(f"\tNode {prednode} can have its data routed to processor {proc} by time {ready_time_t}")
         if ready_time_t > ready_time:
             ready_time = ready_time_t
-    if ready_time == _self.time_offset:
-        assert len(list(dag.predecessors(node))) is 0 or (len(list(dag.predecessors(node))) is 1 and list(dag.predecessors(node))[0] == _self.root_node), \
-            f"Only nodes without predecessors should have a ready time of 0, but node {node} has predecessors {list(dag.predecessors(node))}"
     logger.debug(f"\tReady time determined to be {ready_time}")
 
     computation_time = _self.computation_matrix[node-_self.numExistingJobs, proc]
