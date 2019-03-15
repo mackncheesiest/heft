@@ -29,27 +29,27 @@ def test_canonical_graph():
         8: heft.ScheduleEvent(task=8, start=56.0, end=68.0, proc=1),
         9: heft.ScheduleEvent(task=9, start=73.0, end=80.0, proc=1)
     }
-    expected_matrix_sched = np.array([
-        [2, 0],
-        [0, 0],
-        [2, 1],
-        [1, 0],
-        [2, 2],
-        [1, 1],
-        [2, 3],
-        [0, 1],
-        [1, 2],
-        [1, 3]
-    ])
+    expected_dict_sched = {
+        0: (2, 0, []),
+        1: (0, 0, []),
+        2: (2, 1, [expected_task_sched[0]]),
+        3: (1, 0, []),
+        4: (2, 2, [expected_task_sched[2]]),
+        5: (1, 1, [expected_task_sched[3]]),
+        6: (2, 3, [expected_task_sched[4]]),
+        7: (0, 1, [expected_task_sched[1]]),
+        8: (1, 2, [expected_task_sched[5]]),
+        9: (1, 3, [expected_task_sched[8]])
+    }
 
     dag = heft.readDagMatrix('test/canonicalgraph_task_connectivity.csv')
     comm = heft.readCsvToNumpyMatrix('test/canonicalgraph_resource_BW.csv')
     comp = heft.readCsvToNumpyMatrix('test/canonicalgraph_task_exe_time.csv')
-    proc_sched, task_sched, matrix_sched, _ = heft.schedule_dag(dag, communication_matrix=comm, computation_matrix=comp, proc_schedules=None, time_offset=0, relabel_nodes=True)
+    proc_sched, task_sched, dict_sched = heft.schedule_dag(dag, communication_matrix=comm, computation_matrix=comp, proc_schedules=None, time_offset=0, relabel_nodes=True)
 
     assert proc_sched == expected_proc_sched
     assert task_sched == expected_task_sched
-    assert np.array_equal(matrix_sched, expected_matrix_sched)
+    assert dict_sched == expected_dict_sched
 
 def test_canonical_graph_twice():
     expected_proc_sched = {
@@ -96,38 +96,38 @@ def test_canonical_graph_twice():
         18: heft.ScheduleEvent(task=18, start=87.0, end=99.0, proc=1),
         19: heft.ScheduleEvent(task=19, start=102.0, end=109.0, proc=1)
     }
-    expected_matrix_sched = np.array([
-        [2, 0],
-        [0, 1],
-        [2, 1],
-        [1, 0],
-        [2, 2],
-        [1, 1],
-        [2, 3],
-        [0, 3],
-        [1, 3],
-        [1, 4],
-        [0, 0],
-        [2, 4],
-        [0, 2],
-        [1, 2],
-        [0, 4],
-        [2, 5],
-        [0, 5],
-        [2, 6],
-        [1, 5],
-        [1, 6]
-    ])
+    expected_dict_sched = {
+        0: (2, 0, []),
+        1: (0, 1, [expected_task_sched[10]]),
+        2: (2, 1, [expected_task_sched[0]]),
+        3: (1, 0, []),
+        4: (2, 2, [expected_task_sched[2]]),
+        5: (1, 1, [expected_task_sched[3]]),
+        6: (2, 3, [expected_task_sched[4]]),
+        7: (0, 3, [expected_task_sched[12]]),
+        8: (1, 3, [expected_task_sched[13]]),
+        9: (1, 4, [expected_task_sched[8]]),
+        10: (0, 0, []),
+        11: (2, 4, [expected_task_sched[6]]),
+        12: (0, 2, [expected_task_sched[1]]),
+        13: (1, 2, [expected_task_sched[5]]),
+        14: (0, 4, [expected_task_sched[7]]),
+        15: (2, 5, [expected_task_sched[11]]),
+        16: (0, 5, [expected_task_sched[14]]),
+        17: (2, 6, [expected_task_sched[15]]),
+        18: (1, 5, [expected_task_sched[9]]),
+        19: (1, 6, [expected_task_sched[18]])
+    }
 
     dag = heft.readDagMatrix('test/canonicalgraph_task_connectivity.csv')
     comm = heft.readCsvToNumpyMatrix('test/canonicalgraph_resource_BW.csv')
     comp = heft.readCsvToNumpyMatrix('test/canonicalgraph_task_exe_time.csv')
-    proc_sched, task_sched, matrix_sched, _ = heft.schedule_dag(dag, communication_matrix=comm, computation_matrix=comp, proc_schedules=None, time_offset=0, relabel_nodes=True)
-    proc_sched, task_sched, matrix_sched, _ = heft.schedule_dag(dag, communication_matrix=comm, computation_matrix=comp, proc_schedules=proc_sched, time_offset=10, relabel_nodes=True)
+    proc_sched, task_sched, dict_sched = heft.schedule_dag(dag, communication_matrix=comm, computation_matrix=comp, proc_schedules=None, time_offset=0, relabel_nodes=True)
+    proc_sched, task_sched, dict_sched = heft.schedule_dag(dag, communication_matrix=comm, computation_matrix=comp, proc_schedules=proc_sched, time_offset=10, relabel_nodes=True)
 
     assert proc_sched == expected_proc_sched
     assert task_sched == expected_task_sched
-    assert np.array_equal(matrix_sched, expected_matrix_sched)
+    assert dict_sched == expected_dict_sched
 
 def test_random_graph():
     expected_proc_sched = {
@@ -154,27 +154,27 @@ def test_random_graph():
         8: heft.ScheduleEvent(task=8, start=approx(107.0242, 0.001), end=approx(124.2442, 0.001), proc=1),
         9: heft.ScheduleEvent(task=9, start=approx(168.2705, 0.001), end=approx(184.1923, 0.001), proc=2)
     }
-    expected_matrix_sched = np.array([
-        [2, 0],
-        [0, 0],
-        [1, 0],
-        [0, 1],
-        [2, 1],
-        [2, 2],
-        [1, 2],
-        [0, 2],
-        [1, 1],
-        [2, 3]
-    ])
+    expected_dict_sched = {
+        0: (2, 0, []),
+        1: (0, 0, []),
+        2: (1, 0, []),
+        3: (0, 1, [expected_task_sched[1]]),
+        4: (2, 1, [expected_task_sched[0]]),
+        5: (2, 2, [expected_task_sched[4]]),
+        6: (1, 2, [expected_task_sched[8]]),
+        7: (0, 2, [expected_task_sched[3]]),
+        8: (1, 1, [expected_task_sched[2]]),
+        9: (2, 3, [expected_task_sched[5]])
+    }
     
     dag = heft.readDagMatrix('test/randomgraph_task_connectivity.csv')
     comm = heft.readCsvToNumpyMatrix('test/randomgraph_resource_BW.csv')
     comp = heft.readCsvToNumpyMatrix('test/randomgraph_task_exe_time.csv')
-    proc_sched, task_sched, matrix_sched, _ = heft.schedule_dag(dag, communication_matrix=comm, computation_matrix=comp, proc_schedules=None, time_offset=0, relabel_nodes=True)
+    proc_sched, task_sched, dict_sched = heft.schedule_dag(dag, communication_matrix=comm, computation_matrix=comp, proc_schedules=None, time_offset=0, relabel_nodes=True)
 
     assert proc_sched == expected_proc_sched
     assert task_sched == expected_task_sched
-    assert np.array_equal(matrix_sched, expected_matrix_sched)
+    assert dict_sched == expected_dict_sched
 
 def test_mean_ranku():
     expected_ranku = [
@@ -239,18 +239,18 @@ def test_graph_with_PE_restrictions():
         8: heft.ScheduleEvent(task=8, start=56.0, end=68.0, proc=1),
         9: heft.ScheduleEvent(task=9, start=73.0, end=80.0, proc=1)
     }
-    expected_matrix_sched = np.array([
-        [2, 0],
-        [0, 0],
-        [2, 1],
-        [1, 0],
-        [2, 2],
-        [1, 1],
-        [2, 3],
-        [0, 1],
-        [1, 2],
-        [1, 3]
-    ])
+    expected_dict_sched = {
+        0: (2, 0, []),
+        1: (0, 0, []),
+        2: (2, 1, [expected_task_sched[0]]),
+        3: (1, 0, []),
+        4: (2, 2, [expected_task_sched[2]]),
+        5: (1, 1, [expected_task_sched[3]]),
+        6: (2, 3, [expected_task_sched[4]]),
+        7: (0, 1, [expected_task_sched[1]]),
+        8: (1, 2, [expected_task_sched[5]]),
+        9: (1, 3, [expected_task_sched[8]])
+    }
 
     dag = heft.readDagMatrix('test/canonicalgraph_task_connectivity.csv')
     comm = heft.readCsvToNumpyMatrix('test/canonicalgraph_resource_BW.csv')
@@ -261,8 +261,8 @@ def test_graph_with_PE_restrictions():
     inf_comm = np.concatenate((comm, [[1], [1], [1]]), axis=1)
     inf_comm = np.concatenate((inf_comm, [[1, 1, 1, 0]]), axis=0)
 
-    proc_sched, task_sched, matrix_sched, _ = heft.schedule_dag(dag, communication_matrix=inf_comm, computation_matrix=inf_comp, proc_schedules=None, time_offset=0, relabel_nodes=True)
+    proc_sched, task_sched, dict_sched = heft.schedule_dag(dag, communication_matrix=inf_comm, computation_matrix=inf_comp, proc_schedules=None, time_offset=0, relabel_nodes=True)
 
     assert proc_sched == expected_proc_sched
     assert task_sched == expected_task_sched
-    assert np.array_equal(matrix_sched, expected_matrix_sched)
+    assert dict_sched == expected_dict_sched

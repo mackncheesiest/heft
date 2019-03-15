@@ -128,21 +128,15 @@ def schedule_dag(dag, computation_matrix=W0, communication_matrix=C0, proc_sched
                 assert first_job.end <= second_job.start, \
                 f"Jobs on a particular processor must finish before the next can begin, but job {first_job.task} on processor {first_job.proc} ends at {first_job.end} and its successor {second_job.task} starts at {second_job.start}"
     
-    if relabel_nodes:
-        matrix_output = np.zeros([len(_self.task_schedules), 2], dtype=np.uint8)
-    else:
-        matrix_output = np.zeros([_self.numExistingJobs + len(_self.task_schedules), 2], dtype=np.uint8)
     dict_output = {}
     for proc_num, proc_tasks in _self.proc_schedules.items():
         for idx, task in enumerate(proc_tasks):
-            matrix_output[task.task, 0] = proc_num
-            matrix_output[task.task, 1] = idx
             if idx > 0 and (proc_tasks[idx-1].end - proc_tasks[idx-1].start > 0):
                 dict_output[task.task] = (proc_num, idx, [proc_tasks[idx-1]])
             else:
                 dict_output[task.task] = (proc_num, idx, [])
 
-    return _self.proc_schedules, _self.task_schedules, matrix_output, dict_output
+    return _self.proc_schedules, _self.task_schedules, dict_output
     
 def _compute_ranku(_self, dag, metric=RankMetric.MEAN):
     """
@@ -380,7 +374,7 @@ if __name__ == "__main__":
     computation_matrix = readCsvToNumpyMatrix(args.task_execution_file)
     dag = readDagMatrix(args.dag_file, args.showDAG) 
 
-    processor_schedules, _, _, _ = schedule_dag(dag, communication_matrix=communication_matrix, computation_matrix=computation_matrix, rank_metric=args.rank_metric)
+    processor_schedules, _, _ = schedule_dag(dag, communication_matrix=communication_matrix, computation_matrix=computation_matrix, rank_metric=args.rank_metric)
     for proc, jobs in processor_schedules.items():
         logger.info(f"Processor {proc} has the following jobs:")
         logger.info(f"\t{jobs}")
