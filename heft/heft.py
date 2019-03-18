@@ -132,7 +132,7 @@ def schedule_dag(dag, computation_matrix=W0, communication_matrix=C0, proc_sched
     for proc_num, proc_tasks in _self.proc_schedules.items():
         for idx, task in enumerate(proc_tasks):
             if idx > 0 and (proc_tasks[idx-1].end - proc_tasks[idx-1].start > 0):
-                dict_output[task.task] = (proc_num, idx, [proc_tasks[idx-1]])
+                dict_output[task.task] = (proc_num, idx, [proc_tasks[idx-1].task])
             else:
                 dict_output[task.task] = (proc_num, idx, [])
 

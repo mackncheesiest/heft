@@ -32,14 +32,14 @@ def test_canonical_graph():
     expected_dict_sched = {
         0: (2, 0, []),
         1: (0, 0, []),
-        2: (2, 1, [expected_task_sched[0]]),
+        2: (2, 1, [expected_task_sched[0].task]),
         3: (1, 0, []),
-        4: (2, 2, [expected_task_sched[2]]),
-        5: (1, 1, [expected_task_sched[3]]),
-        6: (2, 3, [expected_task_sched[4]]),
-        7: (0, 1, [expected_task_sched[1]]),
-        8: (1, 2, [expected_task_sched[5]]),
-        9: (1, 3, [expected_task_sched[8]])
+        4: (2, 2, [expected_task_sched[2].task]),
+        5: (1, 1, [expected_task_sched[3].task]),
+        6: (2, 3, [expected_task_sched[4].task]),
+        7: (0, 1, [expected_task_sched[1].task]),
+        8: (1, 2, [expected_task_sched[5].task]),
+        9: (1, 3, [expected_task_sched[8].task])
     }
 
     dag = heft.readDagMatrix('test/canonicalgraph_task_connectivity.csv')
@@ -98,25 +98,25 @@ def test_canonical_graph_twice():
     }
     expected_dict_sched = {
         0: (2, 0, []),
-        1: (0, 1, [expected_task_sched[10]]),
-        2: (2, 1, [expected_task_sched[0]]),
+        1: (0, 1, [expected_task_sched[10].task]),
+        2: (2, 1, [expected_task_sched[0].task]),
         3: (1, 0, []),
-        4: (2, 2, [expected_task_sched[2]]),
-        5: (1, 1, [expected_task_sched[3]]),
-        6: (2, 3, [expected_task_sched[4]]),
-        7: (0, 3, [expected_task_sched[12]]),
-        8: (1, 3, [expected_task_sched[13]]),
-        9: (1, 4, [expected_task_sched[8]]),
+        4: (2, 2, [expected_task_sched[2].task]),
+        5: (1, 1, [expected_task_sched[3].task]),
+        6: (2, 3, [expected_task_sched[4].task]),
+        7: (0, 3, [expected_task_sched[12].task]),
+        8: (1, 3, [expected_task_sched[13].task]),
+        9: (1, 4, [expected_task_sched[8].task]),
         10: (0, 0, []),
-        11: (2, 4, [expected_task_sched[6]]),
-        12: (0, 2, [expected_task_sched[1]]),
-        13: (1, 2, [expected_task_sched[5]]),
-        14: (0, 4, [expected_task_sched[7]]),
-        15: (2, 5, [expected_task_sched[11]]),
-        16: (0, 5, [expected_task_sched[14]]),
-        17: (2, 6, [expected_task_sched[15]]),
-        18: (1, 5, [expected_task_sched[9]]),
-        19: (1, 6, [expected_task_sched[18]])
+        11: (2, 4, [expected_task_sched[6].task]),
+        12: (0, 2, [expected_task_sched[1].task]),
+        13: (1, 2, [expected_task_sched[5].task]),
+        14: (0, 4, [expected_task_sched[7].task]),
+        15: (2, 5, [expected_task_sched[11].task]),
+        16: (0, 5, [expected_task_sched[14].task]),
+        17: (2, 6, [expected_task_sched[15].task]),
+        18: (1, 5, [expected_task_sched[9].task]),
+        19: (1, 6, [expected_task_sched[18].task])
     }
 
     dag = heft.readDagMatrix('test/canonicalgraph_task_connectivity.csv')
@@ -158,13 +158,13 @@ def test_random_graph():
         0: (2, 0, []),
         1: (0, 0, []),
         2: (1, 0, []),
-        3: (0, 1, [expected_task_sched[1]]),
-        4: (2, 1, [expected_task_sched[0]]),
-        5: (2, 2, [expected_task_sched[4]]),
-        6: (1, 2, [expected_task_sched[8]]),
-        7: (0, 2, [expected_task_sched[3]]),
-        8: (1, 1, [expected_task_sched[2]]),
-        9: (2, 3, [expected_task_sched[5]])
+        3: (0, 1, [expected_task_sched[1].task]),
+        4: (2, 1, [expected_task_sched[0].task]),
+        5: (2, 2, [expected_task_sched[4].task]),
+        6: (1, 2, [expected_task_sched[8].task]),
+        7: (0, 2, [expected_task_sched[3].task]),
+        8: (1, 1, [expected_task_sched[2].task]),
+        9: (2, 3, [expected_task_sched[5].task])
     }
     
     dag = heft.readDagMatrix('test/randomgraph_task_connectivity.csv')
@@ -242,14 +242,14 @@ def test_graph_with_PE_restrictions():
     expected_dict_sched = {
         0: (2, 0, []),
         1: (0, 0, []),
-        2: (2, 1, [expected_task_sched[0]]),
+        2: (2, 1, [expected_task_sched[0].task]),
         3: (1, 0, []),
-        4: (2, 2, [expected_task_sched[2]]),
-        5: (1, 1, [expected_task_sched[3]]),
-        6: (2, 3, [expected_task_sched[4]]),
-        7: (0, 1, [expected_task_sched[1]]),
-        8: (1, 2, [expected_task_sched[5]]),
-        9: (1, 3, [expected_task_sched[8]])
+        4: (2, 2, [expected_task_sched[2].task]),
+        5: (1, 1, [expected_task_sched[3].task]),
+        6: (2, 3, [expected_task_sched[4].task]),
+        7: (0, 1, [expected_task_sched[1].task]),
+        8: (1, 2, [expected_task_sched[5].task]),
+        9: (1, 3, [expected_task_sched[8].task])
     }
 
     dag = heft.readDagMatrix('test/canonicalgraph_task_connectivity.csv')
