@@ -50,8 +50,9 @@ class RankMetric(Enum):
     MEAN = "MEAN"
     WORST = "WORST"
     BEST = "BEST"
+    EDP = "EDP"
 
-def schedule_dag(dag, computation_matrix=W0, communication_matrix=C0, proc_schedules=None, time_offset=0, relabel_nodes=True, rank_metric=RankMetric.MEAN):
+def schedule_dag(dag, computation_matrix=W0, communication_matrix=C0, proc_schedules=None, time_offset=0, relabel_nodes=True, rank_metric=RankMetric.MEAN, **kwargs):
     """
     Given an application DAG and a set of matrices specifying PE bandwidth and (task, pe) execution times, computes the HEFT schedule
     of that DAG onto that set of PEs 
@@ -96,7 +97,7 @@ def schedule_dag(dag, computation_matrix=W0, communication_matrix=C0, proc_sched
     _self.root_node = root_node
 
     logger.debug(""); logger.debug("====================== Performing Rank-U Computation ======================\n"); logger.debug("")
-    _compute_ranku(_self, dag, metric=rank_metric)
+    _compute_ranku(_self, dag, metric=rank_metric, **kwargs)
 
     logger.debug(""); logger.debug("====================== Computing EFT for each (task, processor) pair and scheduling in order of decreasing Rank-U ======================"); logger.debug("")
     sorted_nodes = sorted(dag.nodes(), key=lambda node: dag.nodes()[node]['ranku'], reverse=True)
@@ -138,7 +139,7 @@ def schedule_dag(dag, computation_matrix=W0, communication_matrix=C0, proc_sched
 
     return _self.proc_schedules, _self.task_schedules, dict_output
     
-def _compute_ranku(_self, dag, metric=RankMetric.MEAN):
+def _compute_ranku(_self, dag, metric=RankMetric.MEAN, **kwargs):
     """
     Uses a basic BFS approach to traverse upwards through the graph assigning ranku along the way
     """
@@ -197,7 +198,7 @@ def _compute_ranku(_self, dag, metric=RankMetric.MEAN):
             nx.set_node_attributes(dag, { node: comp_matrix_masked[node-_self.numExistingJobs, max_node_idx] + max_successor_ranku}, "ranku")
         elif metric == RankMetric.BEST:
             min_successor_ranku = inf
-            min_node_idx = np.where(comp_matrix_masked[node-_self.numExistingJobs] == min(comp_matrix_masked[node-_self.numExistingJobs]))
+            min_node_idx = np.where(comp_matrix_masked[node-_self.numExistingJobs] == min(comp_matrix_masked[node-_self.numExistingJobs]))[0][0]
             logger.debug(f"\tNode {node} has minimum computation cost on processor {min_node_idx}")
             for succnode in dag.successors(node):
                 logger.debug(f"\tLooking at successor node: {succnode}")
@@ -208,6 +209,20 @@ def _compute_ranku(_self, dag, metric=RankMetric.MEAN):
                     min_successor_ranku = val
             assert min_successor_ranku >= 0, f"Expected minimum successor ranku to be greater or equal to 0 but was {min_successor_ranku}"
             nx.set_node_attributes(dag, { node: comp_matrix_masked[node-_self.numExistingJobs, min_node_idx] + min_successor_ranku}, "ranku")
+        elif metric == RankMetric.EDP:
+            assert energy_dict in kwargs, "In order to perform EDP-based Rank Method, an energy_dict is required"
+            energy_dict = kwargs[energy_dict]
+            energy_dict_masked = np.ma.masked_where(energy_dict[node] == inf, energy_dict[node])
+            max_successor_ranku = -1
+            for succnode in dag.successors(node):
+                logger.debug(f"\tLooking at successor node: {succnode}")
+                logger.debug(f"\tThe edge weight from node {node} to node {succnode} is {dag[node][succnode]['avgweight']}, and the ranku for node {node} is {dag.nodes()[succnode]['ranku']}")
+                val = float(dag[node][succnode]['avgweight']) + dag.nodes()[succnode]['ranku']
+                if val > max_successor_ranku:
+                    max_successor_ranku = val
+            assert max_successor_ranku >= 0, f"Expected maximum successor ranku to be greater or equal to 0 but was {max_successor_ranku}"
+            avg_edp = np.mean(comp_matrix_masked[node-_self.numExistingJobs]) * np.mean(energy_dict_masked)
+            nx.set_node_attributes(dag, { node: avg_edp + max_successor_ranku }, "ranku")
         else:
             raise RuntimeError(f"Unrecognied Rank-U metric {metric}, unable to compute upward rank")
 
