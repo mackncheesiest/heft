@@ -210,8 +210,8 @@ def _compute_ranku(_self, dag, metric=RankMetric.MEAN, **kwargs):
             assert min_successor_ranku >= 0, f"Expected minimum successor ranku to be greater or equal to 0 but was {min_successor_ranku}"
             nx.set_node_attributes(dag, { node: comp_matrix_masked[node-_self.numExistingJobs, min_node_idx] + min_successor_ranku}, "ranku")
         elif metric == RankMetric.EDP:
-            assert energy_dict in kwargs, "In order to perform EDP-based Rank Method, an energy_dict is required"
-            energy_dict = kwargs[energy_dict]
+            assert "energy_dict" in kwargs, "In order to perform EDP-based Rank Method, an energy_dict is required"
+            energy_dict = kwargs.get("energy_dict", np.array([[]]))
             energy_dict_masked = np.ma.masked_where(energy_dict[node] == inf, energy_dict[node])
             max_successor_ranku = -1
             for succnode in dag.successors(node):
