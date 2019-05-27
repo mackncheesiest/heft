@@ -52,6 +52,10 @@ class RankMetric(Enum):
     BEST = "BEST"
     EDP = "EDP"
 
+class OpMode(Enum):
+    EFT = "EFT"
+    EDP = "EDP"
+
 def schedule_dag(dag, computation_matrix=W0, communication_matrix=C0, proc_schedules=None, time_offset=0, relabel_nodes=True, rank_metric=RankMetric.MEAN, **kwargs):
     """
     Given an application DAG and a set of matrices specifying PE bandwidth and (task, pe) execution times, computes the HEFT schedule
@@ -109,10 +113,21 @@ def schedule_dag(dag, computation_matrix=W0, communication_matrix=C0, proc_sched
         if _self.task_schedules[node] is not None:
             continue
         minTaskSchedule = ScheduleEvent(node, inf, inf, -1)
+        minEDP = inf
         for proc in range(len(communication_matrix)):
             taskschedule = _compute_eft(_self, dag, node, proc)
-            if (taskschedule.end < minTaskSchedule.end):
-                minTaskSchedule = taskschedule
+            op_mode = kwargs.get("op_mode", OpMode.EFT)
+            if op_mode == OpMode.EDP:
+                assert "power_dict" in kwargs, "In order to perform EDP-based processor assignment, a power_dict is required"
+                edp_t = ((taskschedule.end - taskschedule.start)**2) * kwargs["power_dict"][node][proc]
+                if (edp_t < minEDP):
+                    minEDP = edp_t
+                    minTaskSchedule = taskschedule
+                elif (edp_t == minEDP and taskschedule.end < minTaskSchedule.end):
+                    minTaskSchedule = taskschedule
+            else:
+                if (taskschedule.end < minTaskSchedule.end):
+                    minTaskSchedule = taskschedule
         _self.task_schedules[node] = minTaskSchedule
         _self.proc_schedules[minTaskSchedule.proc].append(minTaskSchedule)
         _self.proc_schedules[minTaskSchedule.proc] = sorted(_self.proc_schedules[minTaskSchedule.proc], key=lambda schedule_event: schedule_event.end)
@@ -183,6 +198,7 @@ def _compute_ranku(_self, dag, metric=RankMetric.MEAN, **kwargs):
                     max_successor_ranku = val
             assert max_successor_ranku >= 0, f"Expected maximum successor ranku to be greater or equal to 0 but was {max_successor_ranku}"
             nx.set_node_attributes(dag, { node: np.mean(comp_matrix_masked[node-_self.numExistingJobs]) + max_successor_ranku }, "ranku")
+        
         elif metric == RankMetric.WORST:
             max_successor_ranku = -1
             max_node_idx = np.where(comp_matrix_masked[node-_self.numExistingJobs] == max(comp_matrix_masked[node-_self.numExistingJobs]))[0][0]
@@ -196,23 +212,25 @@ def _compute_ranku(_self, dag, metric=RankMetric.MEAN, **kwargs):
                     max_successor_ranku = val
             assert max_successor_ranku >= 0, f"Expected maximum successor ranku to be greater or equal to 0 but was {max_successor_ranku}"
             nx.set_node_attributes(dag, { node: comp_matrix_masked[node-_self.numExistingJobs, max_node_idx] + max_successor_ranku}, "ranku")
+        
         elif metric == RankMetric.BEST:
             min_successor_ranku = inf
             min_node_idx = np.where(comp_matrix_masked[node-_self.numExistingJobs] == min(comp_matrix_masked[node-_self.numExistingJobs]))[0][0]
             logger.debug(f"\tNode {node} has minimum computation cost on processor {min_node_idx}")
             for succnode in dag.successors(node):
                 logger.debug(f"\tLooking at successor node: {succnode}")
-                min_succ_idx = np.where(comp_matrix_masked[succnode-_self.numExistingJobs] == min(comp_matrix_masked[succnode-_self.numExistingJobs]))
+                min_succ_idx = np.where(comp_matrix_masked[succnode-_self.numExistingJobs] == min(comp_matrix_masked[succnode-_self.numExistingJobs]))[0][0]
                 logger.debug(f"\tThis successor node has minimum computation cost on processor {min_succ_idx}")
                 val = _self.communication_matrix[min_node_idx, min_succ_idx] + dag.nodes()[succnode]['ranku']
                 if val < min_successor_ranku:
                     min_successor_ranku = val
             assert min_successor_ranku >= 0, f"Expected minimum successor ranku to be greater or equal to 0 but was {min_successor_ranku}"
             nx.set_node_attributes(dag, { node: comp_matrix_masked[node-_self.numExistingJobs, min_node_idx] + min_successor_ranku}, "ranku")
+        
         elif metric == RankMetric.EDP:
-            assert "energy_dict" in kwargs, "In order to perform EDP-based Rank Method, an energy_dict is required"
-            energy_dict = kwargs.get("energy_dict", np.array([[]]))
-            energy_dict_masked = np.ma.masked_where(energy_dict[node] == inf, energy_dict[node])
+            assert "power_dict" in kwargs, "In order to perform EDP-based Rank Method, a power_dict is required"
+            power_dict = kwargs.get("power_dict", np.array([[]]))
+            power_dict_masked = np.ma.masked_where(power_dict[node] == inf, power_dict[node])
             max_successor_ranku = -1
             for succnode in dag.successors(node):
                 logger.debug(f"\tLooking at successor node: {succnode}")
@@ -221,8 +239,9 @@ def _compute_ranku(_self, dag, metric=RankMetric.MEAN, **kwargs):
                 if val > max_successor_ranku:
                     max_successor_ranku = val
             assert max_successor_ranku >= 0, f"Expected maximum successor ranku to be greater or equal to 0 but was {max_successor_ranku}"
-            avg_edp = np.mean(comp_matrix_masked[node-_self.numExistingJobs]) * np.mean(energy_dict_masked)
+            avg_edp = np.mean(comp_matrix_masked[node-_self.numExistingJobs]) * (np.mean(power_dict_masked)**2)
             nx.set_node_attributes(dag, { node: avg_edp + max_successor_ranku }, "ranku")
+        
         else:
             raise RuntimeError(f"Unrecognied Rank-U metric {metric}, unable to compute upward rank")
 
