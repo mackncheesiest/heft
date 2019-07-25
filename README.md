@@ -10,17 +10,9 @@ A Python 3.6+ implementation of a heuristic DAG scheduling approach from
 
 
 ## Installation
-If you have conda installed, you can create an environment and fetch any necessary dependencies with
+Setting up a virtual environment first is recommended
 
-`conda env create -f heft.yml`
-
-Otherwise, the main dependencies are:
-- Python 3.6+ (uses literal string interpolation)
-- Matplotlib
-- Numpy
-- Networkx
-- Pytest (development dependency only)
-- nb_conda (only if using a conda environment & want jupyter notebook to use the right python version)
+After that, all necessary dependencies can be installed with `pip install -r requirements.txt`
 
 Finally, if you want it available as a local package for availability elsewhere on your system, it can be installed with `pip install .`
 
