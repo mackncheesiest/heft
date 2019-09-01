@@ -1,10 +1,10 @@
-name: HEFT
+name: GH Actions 
 
 on: [push]
 
 jobs:
   build:
-    name: Test Python ${{ matrix.python-version }} on ${{ matrix.os }}
+    name: Python ${{ matrix.python-version }}, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
       max-parallel: 4

@@ -1,6 +1,9 @@
 # HEFT: Heterogeneous Earliest Finish Time
 
+[![Github Actions](https://github.com/mackncheesiest/heft/workflows/GH%20Actions/badge.svg)](https://github.com/mackncheesiest/heft/actions)
+<!--
 [![CircleCI](https://circleci.com/gh/mackncheesiest/heft.svg?style=svg)](https://circleci.com/gh/mackncheesiest/heft)
+-->
 
 A Python 3.6+ implementation of a heuristic DAG scheduling approach from 
 
