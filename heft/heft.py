@@ -54,7 +54,9 @@ class RankMetric(Enum):
 
 class OpMode(Enum):
     EFT = "EFT"
-    EDP = "EDP"
+    EDP_REL = "EDP RELATIVE"
+    EDP_ABS = "EDP ABSOLUTE"
+    ENERGY = "ENERGY"
 
 def schedule_dag(dag, computation_matrix=W0, communication_matrix=C0, proc_schedules=None, time_offset=0, relabel_nodes=True, rank_metric=RankMetric.MEAN, **kwargs):
     """
@@ -114,23 +116,53 @@ def schedule_dag(dag, computation_matrix=W0, communication_matrix=C0, proc_sched
             continue
         minTaskSchedule = ScheduleEvent(node, inf, inf, -1)
         minEDP = inf
-        for proc in range(len(communication_matrix)):
-            taskschedule = _compute_eft(_self, dag, node, proc)
-            op_mode = kwargs.get("op_mode", OpMode.EFT)
-            if op_mode == OpMode.EDP:
-                assert "power_dict" in kwargs, "In order to perform EDP-based processor assignment, a power_dict is required"
+        op_mode = kwargs.get("op_mode", OpMode.EFT)
+        if op_mode == OpMode.EDP_ABS:
+            assert "power_dict" in kwargs, "In order to perform EDP-based processor assignment, a power_dict is required"
+            taskschedules = []
+            minScheduleStart = inf
+
+            for proc in range(len(communication_matrix)):
+                taskschedule = _compute_eft(_self, dag, node, proc)
                 edp_t = ((taskschedule.end - taskschedule.start)**2) * kwargs["power_dict"][node][proc]
                 if (edp_t < minEDP):
                     minEDP = edp_t
                     minTaskSchedule = taskschedule
                 elif (edp_t == minEDP and taskschedule.end < minTaskSchedule.end):
                     minTaskSchedule = taskschedule
-            else:
+        
+        elif op_mode == OpMode.EDP_REL:
+            assert "power_dict" in kwargs, "In order to perform EDP-based processor assignment, a power_dict is required"
+            taskschedules = []
+            minScheduleStart = inf
+
+            for proc in range(len(communication_matrix)):
+                taskschedules.append(_compute_eft(_self, dag, node, proc))
+                if taskschedules[proc].start < minScheduleStart:
+                    minScheduleStart = taskschedules[proc].start
+
+            for taskschedule in taskschedules:
+                # Use the makespan relative to the earliest potential assignment to encourage load balancing
+                edp_t = ((taskschedule.end - minScheduleStart)**2) * kwargs["power_dict"][node][taskschedule.proc]
+                if (edp_t < minEDP):
+                    minEDP = edp_t
+                    minTaskSchedule = taskschedule
+                elif (edp_t == minEDP and taskschedule.end < minTaskSchedule.end):
+                    minTaskSchedule = taskschedule
+        
+        elif op_mode == OpMode.ENERGY:
+            assert False, "Feature not implemented"
+            assert "power_dict" in kwargs, "In order to perform Energy-based processor assignment, a power_dict is required"
+        
+        else:
+            for proc in range(len(communication_matrix)):
+                taskschedule = _compute_eft(_self, dag, node, proc)
                 if (taskschedule.end < minTaskSchedule.end):
                     minTaskSchedule = taskschedule
+        
         _self.task_schedules[node] = minTaskSchedule
         _self.proc_schedules[minTaskSchedule.proc].append(minTaskSchedule)
-        _self.proc_schedules[minTaskSchedule.proc] = sorted(_self.proc_schedules[minTaskSchedule.proc], key=lambda schedule_event: schedule_event.end)
+        _self.proc_schedules[minTaskSchedule.proc] = sorted(_self.proc_schedules[minTaskSchedule.proc], key=lambda schedule_event: (schedule_event.end, schedule_event.start))
         if logger.isEnabledFor(logging.DEBUG):
             logger.debug('\n')
             for proc, jobs in _self.proc_schedules.items():
@@ -153,7 +185,15 @@ def schedule_dag(dag, computation_matrix=W0, communication_matrix=C0, proc_sched
                 dict_output[task.task] = (proc_num, idx, [])
 
     return _self.proc_schedules, _self.task_schedules, dict_output
-    
+
+def _scale_by_operating_freq(_self, **kwargs):
+    if "operating_freqs" not in kwargs:
+        logger.debug("No operating frequency argument is present, assuming at max frequency and values are unchanged")
+        return
+    return #TODO
+    #for pe_num, freq in enumerate(kwargs["operating_freqs"]):
+        #_self.computation_matrix[:, pe_num] = _self.computation_matrix[:, pe_num] * (1 + compute_DVFS_performance_slowdown(pe_num, freq))
+
 def _compute_ranku(_self, dag, metric=RankMetric.MEAN, **kwargs):
     """
     Uses a basic BFS approach to traverse upwards through the graph assigning ranku along the way
@@ -239,7 +279,7 @@ def _compute_ranku(_self, dag, metric=RankMetric.MEAN, **kwargs):
                 if val > max_successor_ranku:
                     max_successor_ranku = val
             assert max_successor_ranku >= 0, f"Expected maximum successor ranku to be greater or equal to 0 but was {max_successor_ranku}"
-            avg_edp = np.mean(comp_matrix_masked[node-_self.numExistingJobs]) * (np.mean(power_dict_masked)**2)
+            avg_edp = np.mean(comp_matrix_masked[node-_self.numExistingJobs])**2 * np.mean(power_dict_masked)
             nx.set_node_attributes(dag, { node: avg_edp + max_successor_ranku }, "ranku")
         
         else:
