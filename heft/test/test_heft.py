@@ -197,6 +197,7 @@ def test_mean_ranku():
     _self = {
         'computation_matrix': comp,
         'communication_matrix': comm,
+        'communication_startup': np.zeros(comm.shape[0]),
         'task_schedules': {},
         'proc_schedules': {},
         'numExistingJobs': 0,
@@ -262,6 +263,55 @@ def test_graph_with_PE_restrictions():
     inf_comm = np.concatenate((inf_comm, [[1, 1, 1, 0]]), axis=0)
 
     proc_sched, task_sched, dict_sched = heft.schedule_dag(dag, communication_matrix=inf_comm, computation_matrix=inf_comp, proc_schedules=None, time_offset=0, relabel_nodes=True)
+
+    assert proc_sched == expected_proc_sched
+    assert task_sched == expected_task_sched
+    assert dict_sched == expected_dict_sched
+
+def test_canonical_graph_with_zero_startup():
+    expected_proc_sched = {
+        0: [heft.ScheduleEvent(task=1, start=27.0, end=40.0, proc=0),
+            heft.ScheduleEvent(task=7, start=57.0, end=62.0, proc=0)],
+        1: [heft.ScheduleEvent(task=3, start=18.0, end=26.0, proc=1),
+            heft.ScheduleEvent(task=5, start=26.0, end=42.0, proc=1),
+            heft.ScheduleEvent(task=8, start=56.0, end=68.0, proc=1),
+            heft.ScheduleEvent(task=9, start=73.0, end=80.0, proc=1)],
+        2: [heft.ScheduleEvent(task=0, start=0, end=9.0, proc=2),
+            heft.ScheduleEvent(task=2, start=9.0, end=28.0, proc=2),
+            heft.ScheduleEvent(task=4, start=28.0, end=38.0, proc=2),
+            heft.ScheduleEvent(task=6, start=38.0, end=49.0, proc=2)]
+    }
+    expected_task_sched = {
+        0: heft.ScheduleEvent(task=0, start=0, end=9.0, proc=2),
+        1: heft.ScheduleEvent(task=1, start=27.0, end=40.0, proc=0),
+        2: heft.ScheduleEvent(task=2, start=9.0, end=28.0, proc=2),
+        3: heft.ScheduleEvent(task=3, start=18.0, end=26.0, proc=1),
+        4: heft.ScheduleEvent(task=4, start=28.0, end=38.0, proc=2),
+        5: heft.ScheduleEvent(task=5, start=26.0, end=42.0, proc=1),
+        6: heft.ScheduleEvent(task=6, start=38.0, end=49.0, proc=2),
+        7: heft.ScheduleEvent(task=7, start=57.0, end=62.0, proc=0),
+        8: heft.ScheduleEvent(task=8, start=56.0, end=68.0, proc=1),
+        9: heft.ScheduleEvent(task=9, start=73.0, end=80.0, proc=1)
+    }
+    expected_dict_sched = {
+        0: (2, 0, []),
+        1: (0, 0, []),
+        2: (2, 1, [expected_task_sched[0].task]),
+        3: (1, 0, []),
+        4: (2, 2, [expected_task_sched[2].task]),
+        5: (1, 1, [expected_task_sched[3].task]),
+        6: (2, 3, [expected_task_sched[4].task]),
+        7: (0, 1, [expected_task_sched[1].task]),
+        8: (1, 2, [expected_task_sched[5].task]),
+        9: (1, 3, [expected_task_sched[8].task])
+    }
+
+    dag = heft.readDagMatrix('test/canonicalgraph_task_connectivity.csv')
+    comm = heft.readCsvToNumpyMatrix('test/canonicalgraph_resource_BW_startup.csv')
+    comm_startup = comm[-1, :]
+    comm = comm[0:-1, :]
+    comp = heft.readCsvToNumpyMatrix('test/canonicalgraph_task_exe_time.csv')
+    proc_sched, task_sched, dict_sched = heft.schedule_dag(dag, communication_matrix=comm, communication_startup=comm_startup, computation_matrix=comp, proc_schedules=None, time_offset=0, relabel_nodes=True)
 
     assert proc_sched == expected_proc_sched
     assert task_sched == expected_task_sched
