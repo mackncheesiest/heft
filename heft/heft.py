@@ -46,6 +46,11 @@ C0 = np.array([
     [1, 1, 0]
 ])
 
+"""
+Default communication startup cost vector
+"""
+L0 = np.array([0, 0, 0])
+
 class RankMetric(Enum):
     MEAN = "MEAN"
     WORST = "WORST"
@@ -58,7 +63,7 @@ class OpMode(Enum):
     EDP_ABS = "EDP ABSOLUTE"
     ENERGY = "ENERGY"
 
-def schedule_dag(dag, computation_matrix=W0, communication_matrix=C0, proc_schedules=None, time_offset=0, relabel_nodes=True, rank_metric=RankMetric.MEAN, **kwargs):
+def schedule_dag(dag, computation_matrix=W0, communication_matrix=C0, communication_startup=L0, proc_schedules=None, time_offset=0, relabel_nodes=True, rank_metric=RankMetric.MEAN, **kwargs):
     """
     Given an application DAG and a set of matrices specifying PE bandwidth and (task, pe) execution times, computes the HEFT schedule
     of that DAG onto that set of PEs 
@@ -69,6 +74,7 @@ def schedule_dag(dag, computation_matrix=W0, communication_matrix=C0, proc_sched
     _self = {
         'computation_matrix': computation_matrix,
         'communication_matrix': communication_matrix,
+        'communication_startup': communication_startup,
         'task_schedules': {},
         'proc_schedules': proc_schedules,
         'numExistingJobs': 0,
@@ -206,7 +212,7 @@ def _compute_ranku(_self, dag, metric=RankMetric.MEAN, **kwargs):
     #avgCommunicationCost = np.mean(_self.communication_matrix[np.where(_self.communication_matrix > 0)])
     diagonal_mask = np.ones(_self.communication_matrix.shape, dtype=bool)
     np.fill_diagonal(diagonal_mask, 0)
-    avgCommunicationCost = np.mean(_self.communication_matrix[diagonal_mask])
+    avgCommunicationCost = np.mean(_self.communication_matrix[diagonal_mask]) + np.mean(_self.communication_startup)
     for edge in dag.edges():
         logger.debug(f"Assigning {edge}'s average weight based on average communication cost. {float(dag.get_edge_data(*edge)['weight'])} => {float(dag.get_edge_data(*edge)['weight']) / avgCommunicationCost}")
         nx.set_edge_attributes(dag, { edge: float(dag.get_edge_data(*edge)['weight']) / avgCommunicationCost }, 'avgweight')
@@ -323,7 +329,7 @@ def _compute_eft(_self, dag, node, proc):
         if _self.communication_matrix[predjob.proc, proc] == 0:
             ready_time_t = predjob.end
         else:
-            ready_time_t = predjob.end + dag[predjob.task][node]['weight'] / _self.communication_matrix[predjob.proc, proc]
+            ready_time_t = predjob.end + dag[predjob.task][node]['weight'] / _self.communication_matrix[predjob.proc, proc] + _self.communication_startup[predjob.proc]
         logger.debug(f"\tNode {prednode} can have its data routed to processor {proc} by time {ready_time_t}")
         if ready_time_t > ready_time:
             ready_time = ready_time_t
@@ -415,7 +421,7 @@ def generate_argparser():
                         help="File containing input DAG to be scheduled. Uses default 10 node dag from Topcuoglu 2002 if none given.", 
                         type=str, default="test/canonicalgraph_task_connectivity.csv")
     parser.add_argument("-p", "--pe_connectivity_file", 
-                        help="File containing connectivity/bandwidth information about PEs. Uses a default 3x3 matrix from Topcuoglu 2002 if none given.", 
+                        help="File containing connectivity/bandwidth information about PEs. Uses a default 3x3 matrix from Topcuoglu 2002 if none given. If communication startup costs (L) are needed, a \"Startup\" row can be used as the last CSV row", 
                         type=str, default="test/canonicalgraph_resource_BW.csv")
     parser.add_argument("-t", "--task_execution_file", 
                         help="File containing execution times of each task on each particular PE. Uses a default 10x3 matrix from Topcuoglu 2002 if none given.", 
@@ -447,8 +453,16 @@ if __name__ == "__main__":
     communication_matrix = readCsvToNumpyMatrix(args.pe_connectivity_file)
     computation_matrix = readCsvToNumpyMatrix(args.task_execution_file)
     dag = readDagMatrix(args.dag_file, args.showDAG) 
+    
+    if (communication_matrix.shape[0] != communication_matrix.shape[1]):
+        assert communication_matrix.shape[0]-1 == communication_matrix.shape[1], "If the communication_matrix CSV is non-square, there must only be a single additional row specifying the communication startup costs of each PE"
+        logger.debug("Non-square communication matrix parsed. Stripping off the last row as communication startup costs");
+        communication_startup = communication_matrix[-1, :]
+        communication_matrix = communication_matrix[0:-1, :]
+    else:
+        communication_startup = np.zeros(communication_matrix.shape[0])
 
-    processor_schedules, _, _ = schedule_dag(dag, communication_matrix=communication_matrix, computation_matrix=computation_matrix, rank_metric=args.rank_metric)
+    processor_schedules, _, _ = schedule_dag(dag, communication_matrix=communication_matrix, communication_startup=communication_startup, computation_matrix=computation_matrix, rank_metric=args.rank_metric)
     for proc, jobs in processor_schedules.items():
         logger.info(f"Processor {proc} has the following jobs:")
         logger.info(f"\t{jobs}")
