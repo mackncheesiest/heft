@@ -375,7 +375,7 @@ def readCsvToNumpyMatrix(csv_file):
         contents = fd.read()
         contentsList = contents.split('\n')
         contentsList = list(map(lambda line: line.split(','), contentsList))
-        contentsList = contentsList[0:len(contentsList)-1] if contentsList[len(contentsList)-1] == [''] else contentsList
+        contentsList = list(filter(lambda arr: arr != [''], contentsList))
         
         matrix = np.array(contentsList)
         matrix = np.delete(matrix, 0, 0) # delete the first row (entry 0 along axis 0)
