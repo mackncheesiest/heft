@@ -13,6 +13,7 @@ Includes alternative heuristics that were leveraged as a part of this work:
 `J. Mack, S. E. Arda, U. Y. Ogras and A. Akoglu, "Performant, Multi-Objective Scheduling of Highly Interleaved Task Graphs on Heterogeneous System on Chip Devices," in IEEE Transactions on Parallel and Distributed Systems, vol. 33, no. 9, pp. 2148-2162, 1 Sept. 2022, doi: 10.1109/TPDS.2021.3135876.`
 
 [IEEE Explore](https://ieeexplore.ieee.org/abstract/document/9653796)
+
 [arXiv](https://arxiv.org/abs/2112.08980)
 
 ## Installation
