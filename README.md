@@ -1,16 +1,19 @@
 # HEFT: Heterogeneous Earliest Finish Time
 
 [![Github Actions](https://github.com/mackncheesiest/heft/workflows/GH%20Actions/badge.svg)](https://github.com/mackncheesiest/heft/actions)
-<!--
-[![CircleCI](https://circleci.com/gh/mackncheesiest/heft.svg?style=svg)](https://circleci.com/gh/mackncheesiest/heft)
--->
 
 A Python 3.6+ implementation of a heuristic DAG scheduling approach from 
 
 `H. Topcuoglu, S. Hariri and Min-You Wu, "Performance-effective and low-complexity task scheduling for heterogeneous computing," in IEEE Transactions on Parallel and Distributed Systems, vol. 13, no. 3, pp. 260-274, March 2002.`
 
-[IEEE Explore Link](https://ieeexplore.ieee.org/document/993206)
+[IEEE Explore](https://ieeexplore.ieee.org/document/993206)
 
+Includes alternative heuristics that were leveraged as a part of this work:
+
+`J. Mack, S. E. Arda, U. Y. Ogras and A. Akoglu, "Performant, Multi-Objective Scheduling of Highly Interleaved Task Graphs on Heterogeneous System on Chip Devices," in IEEE Transactions on Parallel and Distributed Systems, vol. 33, no. 9, pp. 2148-2162, 1 Sept. 2022, doi: 10.1109/TPDS.2021.3135876.`
+
+[IEEE Explore](https://ieeexplore.ieee.org/abstract/document/9653796)
+[arXiv](https://arxiv.org/abs/2112.08980)
 
 ## Installation
 Setting up a virtual environment first is recommended
